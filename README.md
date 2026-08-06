@@ -5,6 +5,8 @@ This repository contains the source code for the [Cambridge South Hockey Club we
 
 Full documentation (work-in-progress) can be found here: [cshc.readthedocs.io](http://cshc.readthedocs.io/en/latest/index.html)
 
+The working migration runbook for the planned platform and dependency upgrade lives in [MODERNIZATION_PLAN.md](MODERNIZATION_PLAN.md).
+
 ## Migrating Database from Production to Local Env
 
 1. On the EC2 instance:
