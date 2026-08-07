@@ -63,6 +63,7 @@ The target baseline for the modernized application is:
 - Some Ubuntu-specific operator familiarity will be lost, including `apt`, `apache2`, and other Debian-style package and service conventions.
 - The chosen path is somewhat more AWS-aligned operationally, but that tradeoff is acceptable because the goal is to simplify deployment on Elastic Beanstalk rather than preserve a generic hand-built host model.
 - The current Ubuntu automation includes `apt`, `apache2`, the `ubuntu` SSH user, Certbot on the instance, local MySQL, cron, and `mod_wsgi`; carrying that model forward would turn the modernization into an OS maintenance project instead of an application modernization.
+- The preferred Elastic Beanstalk TLS model is ACM certificates attached to an Application Load Balancer, which is a cleaner fit for managed operations but may add meaningful monthly cost if the current production environment is still single-instance without a load balancer.
 
 ### Chosen Upgrade Strategy
 
@@ -88,6 +89,14 @@ The modernized production architecture should be:
 - TLS terminated using AWS-managed components rather than committed certificates in the repo
 - Secrets stored in AWS-managed configuration or secret storage
 - Scheduled jobs invoked through portable operational commands, not instance-specific path assumptions
+
+### Certificate Strategy
+
+- The preferred Elastic Beanstalk certificate model is AWS Certificate Manager with TLS terminated at an Application Load Balancer.
+- This is the normal AWS-supported pattern for HTTPS on Elastic Beanstalk and is the default target architecture for the modernization.
+- Continuing to use Certbot on the instance is technically possible through custom Elastic Beanstalk configuration, but it is a custom workaround rather than the preferred managed-platform design.
+- Instance-local certificate issuance and renewal increase host customization, replacement complexity, and future migration effort, especially for any later move to ECS Fargate or Elastic Beanstalk Docker.
+- The current repository strongly suggests direct HTTPS termination on the instance; if production is still single-instance, moving to ACM plus ALB will likely add a real monthly cost and should be treated as a deliberate tradeoff rather than a free improvement.
 
 ### Portability Rules
 
@@ -155,11 +164,13 @@ Work:
 - Replace the current custom Apache/mod_wsgi-centric deployment shape with the supported EB Python process model using `gunicorn`.
 - Use Amazon Linux through the supported Elastic Beanstalk platform rather than through a bespoke AMI strategy.
 - Remove hard-coded Elastic Beanstalk Python 3.6 paths from deployment configuration.
-- Replace instance-local TLS certificate handling with AWS-managed TLS termination.
+- Replace instance-local TLS certificate handling with AWS-managed TLS termination, with ACM plus ALB as the default target.
 - Replace instance-local cron assumptions with a portable scheduling approach. If EB-hosted scheduling is retained temporarily, the invoked command must still be environment-agnostic and standalone.
 - Ensure the application can be started, migrated, and collected with explicit commands without relying on Apache configuration side effects.
 - Do not port the current Ubuntu Apache/mod_wsgi/Certbot/cron shape to Amazon Linux; replace that host-centric model with the minimum supported Elastic Beanstalk runtime model.
 - Treat the legacy Ubuntu CloudFormation and Ansible automation as reference material for inventory and migration only, not as implementation to be updated in place.
+- If ACM plus ALB is rejected on cost grounds, document the fallback as an explicit short-term exception; do not silently carry forward Certbot or committed certificate files as part of the target design.
+- Even in any short-term fallback, remove committed private key and certificate material from the repository and document certificate issuance, renewal, and rotation ownership.
 - Rationalize EB hooks and container commands to the minimum required deployment behavior.
 
 Exit criteria:
