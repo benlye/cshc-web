@@ -12,7 +12,7 @@ The target baseline for the modernized application is:
 - Django `4.2 LTS`
 - Node `20 LTS`
 - npm `10`
-- AWS Elastic Beanstalk with a modern Python platform and a portable application startup model
+- AWS Elastic Beanstalk on Amazon Linux with a modern Python platform and a portable application startup model
 
 ## Current State Assessment
 
@@ -50,9 +50,19 @@ The target baseline for the modernized application is:
 
 - Production hosting remains on AWS.
 - The application will be modernized on Elastic Beanstalk first.
-- The modernization will avoid deepening dependence on old EB-specific behavior.
+- The production modernization target is a current Elastic Beanstalk Python platform on Amazon Linux.
+- A hand-curated Ubuntu AMI or self-managed EC2 host build is not the target end state.
+- The legacy Ubuntu CloudFormation and Ansible automation is migration input only, not the basis of the future platform.
+- The modernization will avoid deepening dependence on old EB-specific behavior or old Ubuntu host assumptions.
 - ECS Fargate remains a future option, not part of the current migration.
 - EKS is explicitly out of scope because it is too operationally and financially heavy for this use case.
+
+### Accepted Platform Tradeoffs
+
+- Reusing the existing Ubuntu automation is not a priority because that automation preserves host ownership the modernization is meant to reduce.
+- Some Ubuntu-specific operator familiarity will be lost, including `apt`, `apache2`, and other Debian-style package and service conventions.
+- The chosen path is somewhat more AWS-aligned operationally, but that tradeoff is acceptable because the goal is to simplify deployment on Elastic Beanstalk rather than preserve a generic hand-built host model.
+- The current Ubuntu automation includes `apt`, `apache2`, the `ubuntu` SSH user, Certbot on the instance, local MySQL, cron, and `mod_wsgi`; carrying that model forward would turn the modernization into an OS maintenance project instead of an application modernization.
 
 ### Chosen Upgrade Strategy
 
@@ -71,7 +81,7 @@ The target baseline for the modernized application is:
 
 The modernized production architecture should be:
 
-- AWS Elastic Beanstalk on a current Python platform
+- AWS Elastic Beanstalk on a current Amazon Linux Python platform
 - Django served by `gunicorn`
 - MySQL on Amazon RDS
 - Static and media assets stored in S3
@@ -87,7 +97,15 @@ All modernization work should preserve a clean future path to ECS Fargate by enf
 - Static and media assets do not depend on local instance storage.
 - The app starts with a standard process command such as `gunicorn cshc.wsgi`.
 - Migrations, static collection, and scheduled jobs are standalone commands that can be run in any compatible execution environment.
-- No production behavior depends on Apache-specific or host-path-specific configuration.
+- No production behavior depends on Apache-specific, Ubuntu-specific, or host-path-specific configuration.
+
+### Developer Workflow
+
+- Local development remains containerized and should continue to work well on Windows with Docker Desktop and WSL2.
+- Local development should track runtime parity rather than OS parity: Python `3.12`, Node `20`, the same app dependencies, and the same operational commands where practical.
+- Local development does not need to run Amazon Linux; Debian-based or Ubuntu-based development containers are acceptable if they reproduce the required application behavior.
+- If OS-specific packaging concerns need validation, handle that in CI or a separate parity image rather than making Amazon Linux the default developer environment.
+- Choosing Amazon Linux on Elastic Beanstalk now does not materially block a later move to ECS Fargate or Elastic Beanstalk Docker, provided host-specific behavior continues to be removed.
 
 ## Phased Migration Plan
 
@@ -128,16 +146,20 @@ Exit criteria:
 Goals:
 
 - remove Python 3.6 and Apache/mod_wsgi coupling
+- remove dependence on the legacy Ubuntu host build shape
 - modernize the deployment shape before major dependency upgrades
 - keep EB, but make the app runtime portable
 
 Work:
 
 - Replace the current custom Apache/mod_wsgi-centric deployment shape with the supported EB Python process model using `gunicorn`.
+- Use Amazon Linux through the supported Elastic Beanstalk platform rather than through a bespoke AMI strategy.
 - Remove hard-coded Elastic Beanstalk Python 3.6 paths from deployment configuration.
 - Replace instance-local TLS certificate handling with AWS-managed TLS termination.
 - Replace instance-local cron assumptions with a portable scheduling approach. If EB-hosted scheduling is retained temporarily, the invoked command must still be environment-agnostic and standalone.
 - Ensure the application can be started, migrated, and collected with explicit commands without relying on Apache configuration side effects.
+- Do not port the current Ubuntu Apache/mod_wsgi/Certbot/cron shape to Amazon Linux; replace that host-centric model with the minimum supported Elastic Beanstalk runtime model.
+- Treat the legacy Ubuntu CloudFormation and Ansible automation as reference material for inventory and migration only, not as implementation to be updated in place.
 - Rationalize EB hooks and container commands to the minimum required deployment behavior.
 
 Exit criteria:
