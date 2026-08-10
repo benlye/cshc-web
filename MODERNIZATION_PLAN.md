@@ -78,17 +78,36 @@ The target baseline for the modernized application is:
 - Keep infrastructure simple enough to be maintainable for a nonprofit sports club.
 - Invest effort in app portability and deployment clarity rather than in a larger platform rewrite.
 
+### Chosen Database Strategy
+
+- Production will remain on MySQL during this modernization rather than combining the Django upgrade with a database-engine migration.
+- The target production database platform is a self-hosted MySQL instance on the production Amazon Linux host, not Amazon RDS.
+- The default cost posture is a single-instance design that accepts manual recovery work in exchange for avoiding the recurring RDS cost.
+- PostgreSQL remains a valid future option in Django, but moving to it is explicitly out of scope for this modernization because it would add avoidable migration risk.
+- SQLite remains acceptable for lightweight local development, but production-significant validation must run against MySQL and not rely only on SQLite behavior.
+
 ## Target Architecture
 
 The modernized production architecture should be:
 
 - AWS Elastic Beanstalk on a current Amazon Linux Python platform
 - Django served by `gunicorn`
-- MySQL on Amazon RDS
+- Self-hosted MySQL on the production Amazon Linux host
 - Static and media assets stored in S3
 - TLS terminated using AWS-managed components rather than committed certificates in the repo
 - Secrets stored in AWS-managed configuration or secret storage
 - Scheduled jobs invoked through portable operational commands, not instance-specific path assumptions
+
+### Database Strategy
+
+- Use Django's MySQL backend in production via `django.db.backends.mysql`.
+- Use a current supported MySQL driver for modern Django, with `mysqlclient` as the default implementation choice unless execution uncovers a concrete blocker.
+- Standardize on modern MySQL defaults appropriate for Django, including `InnoDB` and `utf8mb4`, rather than preserving legacy `MyISAM` assumptions.
+- Remove the current migration-time `default_storage_engine=MyISAM` workaround during backend modernization after verifying all historical migrations and schema behavior on the target MySQL version.
+- Keep the database host-local and cost-optimized for now, with Amazon RDS treated as a future operational upgrade path rather than the default target.
+- Do not treat MariaDB as an automatic drop-in choice; if MySQL compatibility questions arise, prefer remaining on self-hosted MySQL unless cost or operational pressure forces a managed-service change.
+- Recognize Django's modern supported database backends as PostgreSQL, MariaDB, MySQL, Oracle, and SQLite, but treat MySQL as the locked production target for this migration.
+- Continue using the existing S3-backed logical backup approach through `django-dbbackup`; this is not built into Django itself and must remain explicitly configured and validated.
 
 ### Certificate Strategy
 
@@ -129,8 +148,10 @@ Goals:
 Work:
 
 - Inventory all required production environment variables.
-- Inventory AWS resources in use: Elastic Beanstalk environment, RDS, S3 buckets, DNS, TLS termination, cron-equivalent jobs, and any cache services.
+- Inventory AWS resources and host responsibilities in use: Elastic Beanstalk environment, S3 buckets, DNS, TLS termination, cron-equivalent jobs, any cache services, and any host-level MySQL service assumptions.
 - Confirm production database engine/version and backup/restore process.
+- Confirm production database storage engine, charset, and collation defaults so the MyISAM-era assumptions can be removed safely.
+- Confirm the current database data path, disk allocation, and restart behavior so host-local persistence expectations are explicit before implementation.
 - Confirm current static/media bucket layout and retention expectations.
 - Document all management commands used operationally, including `nightly_tasks`, `collectstatic`, `compress`, and migrations.
 - Create a staging environment on the target EB platform before production cutover.
@@ -166,12 +187,15 @@ Work:
 - Remove hard-coded Elastic Beanstalk Python 3.6 paths from deployment configuration.
 - Replace instance-local TLS certificate handling with AWS-managed TLS termination, with ACM plus ALB as the default target.
 - Replace instance-local cron assumptions with a portable scheduling approach. If EB-hosted scheduling is retained temporarily, the invoked command must still be environment-agnostic and standalone.
+- Install and manage MySQL as a host service on the production Amazon Linux instance rather than introducing RDS as part of this modernization.
+- Lock the production environment to a deliberate single-instance operating model while the database remains host-local; do not assume autoscaling-safe stateless application instances.
 - Ensure the application can be started, migrated, and collected with explicit commands without relying on Apache configuration side effects.
 - Do not port the current Ubuntu Apache/mod_wsgi/Certbot/cron shape to Amazon Linux; replace that host-centric model with the minimum supported Elastic Beanstalk runtime model.
 - Treat the legacy Ubuntu CloudFormation and Ansible automation as reference material for inventory and migration only, not as implementation to be updated in place.
 - If ACM plus ALB is rejected on cost grounds, document the fallback as an explicit short-term exception; do not silently carry forward Certbot or committed certificate files as part of the target design.
 - Even in any short-term fallback, remove committed private key and certificate material from the repository and document certificate issuance, renewal, and rotation ownership.
 - Rationalize EB hooks and container commands to the minimum required deployment behavior.
+- Document database startup, backup, restore, and rebuild procedures as first-class host operations.
 
 Exit criteria:
 
@@ -198,6 +222,7 @@ Work for each hop:
 - upgrade Django and packages to versions compatible with the target checkpoint
 - run migrations and smoke tests
 - fix deprecations before moving to the next checkpoint
+- keep production on MySQL throughout the framework upgrade rather than introducing a PostgreSQL or other engine migration in parallel
 
 Code changes expected across the backend:
 
@@ -208,6 +233,8 @@ Code changes expected across the backend:
 - replace `raven` WSGI and logging integration with `sentry-sdk`
 - replace deprecated or removed storage/backups configuration
 - update any package usage affected by newer Django ORM, admin, form, middleware, or settings semantics
+- update the MySQL driver to a version supported by the target Django release
+- remove the `default_storage_engine=MyISAM` migration override after validating the target schema on modern MySQL with `InnoDB`
 
 Special areas requiring close review:
 
@@ -353,6 +380,9 @@ Packages requiring explicit compatibility review during execution:
 ### Required Operational Changes
 
 - Validate database migration strategy against production data.
+- Accept that database and web host responsibilities are intentionally coupled in the low-cost target design, and document the recovery implications clearly.
+- Rehearse restoring the S3-backed MySQL dump onto a rebuilt host rather than relying on managed database recovery features.
+- Monitor disk, memory, and restart behavior closely because Django, MySQL, cron jobs, and any local cache will share one instance.
 - Validate S3 media and static access patterns after storage backend migration.
 - Ensure the scheduled job mechanism is explicit and documented.
 - Ensure error reporting continues to work after the move from `raven`.
@@ -420,6 +450,17 @@ Mitigation:
 - inventory AWS resources and production settings before implementation
 - validate staging against observed production behavior rather than repo assumptions alone
 
+### Risk: Host-Local Database Coupling
+
+Running MySQL on the same host as Django reduces cost but couples application availability, database availability, and instance lifecycle.
+
+Mitigation:
+
+- keep reliable nightly logical backups in S3
+- rehearse restore onto a fresh host
+- avoid multi-instance or autoscaling assumptions while the database is host-local
+- size the host for combined web and database load rather than for Django alone
+
 ### Risk: Frontend Toolchain Churn
 
 Webpack/Babel/React changes can create many small integration failures even if the visible app stays the same.
@@ -473,6 +514,9 @@ The current modernization must therefore avoid reintroducing host-specific behav
 These items should be answered or confirmed before execution begins:
 
 - the exact current production database version
+- the current database storage engine, charset, and collation defaults
+- the current database data path, persistence model, and available disk headroom on the production host
+- whether the chosen Amazon Linux instance size remains viable once MySQL runs on the same host as Django and scheduled jobs
 - whether production still includes any unmanaged Ubuntu 18.04 host outside the repo-defined EB flow
 - current TLS termination path and DNS ownership details
 - whether memcached should be retained or replaced during modernization
