@@ -4,7 +4,7 @@
 
 This document is the working runbook for modernizing the Cambridge South Hockey Club website. The current application is a Django web app with a React/Webpack frontend and an AWS Elastic Beanstalk deployment shape that dates back to 2018. The codebase still reflects Python 3.6, Django 2.0, Node/Webpack/Babel 2017-era tooling, several unmaintained Python packages, and deployment assumptions tied to old Elastic Beanstalk Apache and mod_wsgi internals.
 
-The chosen path is to modernize the application on AWS Elastic Beanstalk first, because it is the lower-cost option for the club and avoids taking on unnecessary platform complexity during the dependency upgrade. The modernization must be done in a way that improves application portability so that a later move to ECS Fargate remains straightforward if operational needs change.
+The chosen path is to modernize the application on AWS Elastic Beanstalk first, because it is the lower-cost option for the club and avoids taking on unnecessary platform complexity during the dependency upgrade. The modernization must be done in a way that improves application portability and preserves a clean future path to containerization or other runtime changes if operational needs change.
 
 The target baseline for the modernized application is:
 
@@ -54,7 +54,7 @@ The target baseline for the modernized application is:
 - A hand-curated Ubuntu AMI or self-managed EC2 host build is not the target end state.
 - The legacy Ubuntu CloudFormation and Ansible automation is migration input only, not the basis of the future platform.
 - The modernization will avoid deepening dependence on old EB-specific behavior or old Ubuntu host assumptions.
-- ECS Fargate remains a future option, not part of the current migration.
+- Future containerized deployment remains an option, but no specific future runtime platform is locked in by this plan.
 - EKS is explicitly out of scope because it is too operationally and financially heavy for this use case.
 
 ### Accepted Platform Tradeoffs
@@ -63,7 +63,7 @@ The target baseline for the modernized application is:
 - Some Ubuntu-specific operator familiarity will be lost, including `apt`, `apache2`, and other Debian-style package and service conventions.
 - The chosen path is somewhat more AWS-aligned operationally, but that tradeoff is acceptable because the goal is to simplify deployment on Elastic Beanstalk rather than preserve a generic hand-built host model.
 - The current Ubuntu automation includes `apt`, `apache2`, the `ubuntu` SSH user, Certbot on the instance, local MySQL, cron, and `mod_wsgi`; carrying that model forward would turn the modernization into an OS maintenance project instead of an application modernization.
-- The preferred Elastic Beanstalk TLS model is ACM certificates attached to an Application Load Balancer, which is a cleaner fit for managed operations but may add meaningful monthly cost if the current production environment is still single-instance without a load balancer.
+- For the current single-host cost target, instance-local Certbot is the preferred TLS model; ACM on an Application Load Balancer remains a later option if the site moves to a load-balanced or more stateless deployment shape.
 
 ### Chosen Upgrade Strategy
 
@@ -94,7 +94,7 @@ The modernized production architecture should be:
 - Django served by `gunicorn`
 - Self-hosted MySQL on the production Amazon Linux host
 - Static and media assets stored in S3
-- TLS terminated using AWS-managed components rather than committed certificates in the repo
+- TLS terminated on the host using Certbot-managed certificates, not committed certificate files in the repo
 - Secrets stored in AWS-managed configuration or secret storage
 - Scheduled jobs invoked through portable operational commands, not instance-specific path assumptions
 
@@ -111,21 +111,22 @@ The modernized production architecture should be:
 
 ### Certificate Strategy
 
-- The preferred Elastic Beanstalk certificate model is AWS Certificate Manager with TLS terminated at an Application Load Balancer.
-- This is the normal AWS-supported pattern for HTTPS on Elastic Beanstalk and is the default target architecture for the modernization.
-- Continuing to use Certbot on the instance is technically possible through custom Elastic Beanstalk configuration, but it is a custom workaround rather than the preferred managed-platform design.
-- Instance-local certificate issuance and renewal increase host customization, replacement complexity, and future migration effort, especially for any later move to ECS Fargate or Elastic Beanstalk Docker.
-- The current repository strongly suggests direct HTTPS termination on the instance; if production is still single-instance, moving to ACM plus ALB will likely add a real monthly cost and should be treated as a deliberate tradeoff rather than a free improvement.
+- The preferred certificate model for the current single-host production design is Certbot-managed certificates on the instance.
+- This is the lower-cost and more practical HTTPS model while production remains single-instance and host-centric.
+- Certificate issuance, renewal, and deployment must be automated and documented; do not keep private key or certificate material committed in the repository.
+- Instance-local certificate issuance and renewal increase host customization, replacement complexity, and future migration effort, especially for any later move to a containerized or more stateless deployment model.
+- If a load balancer is introduced later, the preferred follow-on model is AWS Certificate Manager with TLS terminated at an Application Load Balancer rather than continuing to manage certificates on the host.
 
 ### Portability Rules
 
-All modernization work should preserve a clean future path to ECS Fargate by enforcing these rules:
+All modernization work should preserve a clean future path to containerization or other runtime changes by enforcing these rules:
 
 - Application configuration comes from environment variables and secret stores only.
 - Static and media assets do not depend on local instance storage.
 - The app starts with a standard process command such as `gunicorn cshc.wsgi`.
 - Migrations, static collection, and scheduled jobs are standalone commands that can be run in any compatible execution environment.
 - No production behavior depends on Apache-specific, Ubuntu-specific, or host-path-specific configuration.
+- Application runtime assumptions stay compatible with a single-process container model even if production is not containerized yet.
 
 ### Developer Workflow
 
@@ -133,7 +134,7 @@ All modernization work should preserve a clean future path to ECS Fargate by enf
 - Local development should track runtime parity rather than OS parity: Python `3.12`, Node `20`, the same app dependencies, and the same operational commands where practical.
 - Local development does not need to run Amazon Linux; Debian-based or Ubuntu-based development containers are acceptable if they reproduce the required application behavior.
 - If OS-specific packaging concerns need validation, handle that in CI or a separate parity image rather than making Amazon Linux the default developer environment.
-- Choosing Amazon Linux on Elastic Beanstalk now does not materially block a later move to ECS Fargate or Elastic Beanstalk Docker, provided host-specific behavior continues to be removed.
+- Choosing Amazon Linux on Elastic Beanstalk now does not materially block later containerization or another deployment packaging model, provided host-specific behavior continues to be removed.
 
 ## Phased Migration Plan
 
@@ -185,15 +186,15 @@ Work:
 - Replace the current custom Apache/mod_wsgi-centric deployment shape with the supported EB Python process model using `gunicorn`.
 - Use Amazon Linux through the supported Elastic Beanstalk platform rather than through a bespoke AMI strategy.
 - Remove hard-coded Elastic Beanstalk Python 3.6 paths from deployment configuration.
-- Replace instance-local TLS certificate handling with AWS-managed TLS termination, with ACM plus ALB as the default target.
+- Retain instance-local TLS termination with Certbot as the default for the low-cost single-host design, but modernize the configuration so certificate issuance, renewal, and deployment are automated and documented.
 - Replace instance-local cron assumptions with a portable scheduling approach. If EB-hosted scheduling is retained temporarily, the invoked command must still be environment-agnostic and standalone.
 - Install and manage MySQL as a host service on the production Amazon Linux instance rather than introducing RDS as part of this modernization.
 - Lock the production environment to a deliberate single-instance operating model while the database remains host-local; do not assume autoscaling-safe stateless application instances.
 - Ensure the application can be started, migrated, and collected with explicit commands without relying on Apache configuration side effects.
 - Do not port the current Ubuntu Apache/mod_wsgi/Certbot/cron shape to Amazon Linux; replace that host-centric model with the minimum supported Elastic Beanstalk runtime model.
 - Treat the legacy Ubuntu CloudFormation and Ansible automation as reference material for inventory and migration only, not as implementation to be updated in place.
-- If ACM plus ALB is rejected on cost grounds, document the fallback as an explicit short-term exception; do not silently carry forward Certbot or committed certificate files as part of the target design.
-- Even in any short-term fallback, remove committed private key and certificate material from the repository and document certificate issuance, renewal, and rotation ownership.
+- Do not treat Certbot as a short-term exception in the single-host design; treat it as the intentional low-cost default until the deployment model changes.
+- Remove committed private key and certificate material from the repository and document certificate issuance, renewal, and rotation ownership.
 - Rationalize EB hooks and container commands to the minimum required deployment behavior.
 - Document database startup, backup, restore, and rebuild procedures as first-class host operations.
 
@@ -493,21 +494,25 @@ Minimum rollback components:
 
 Rollback rehearsal should be performed in staging or an equivalent safe environment before the production change window.
 
-## Future Option: ECS Fargate
+## Future Runtime Options
 
-Elastic Beanstalk is the chosen near-term target because it is cheaper and operationally lighter for this site. A later move to ECS Fargate should remain possible with limited app rework if the modernization follows the portability rules in this document.
+Elastic Beanstalk is the chosen near-term target because it is cheaper and operationally lighter for this site. A later move to a different packaging or runtime model should remain possible with limited app rework if the modernization follows the portability rules in this document.
 
-If a later Fargate migration is pursued, the intended shape is:
+Possible future directions include:
 
-- ALB in front of the web service
-- Django web container running `gunicorn`
-- RDS for MySQL
-- S3 for static and media
-- ECR for container images
-- AWS-managed secrets/configuration
-- scheduled tasks run through ECS scheduled tasks or an equivalent AWS-native scheduling mechanism
+- Elastic Beanstalk with a containerized application runtime
+- ECS Fargate
+- another container-hosting model with comparable operational characteristics
 
-The current modernization must therefore avoid reintroducing host-specific behavior that would complicate containerization later.
+Any later migration of that kind should assume:
+
+- a Django web process running `gunicorn`
+- externally managed static and media storage
+- AWS-managed or equivalent secrets/configuration
+- operational commands that can run independently of host-specific layout
+- a database strategy chosen separately from the web runtime packaging decision
+
+The current modernization must therefore avoid reintroducing host-specific behavior that would complicate containerization or another deployment packaging change later.
 
 ## Open Questions and Prerequisites
 
@@ -535,4 +540,4 @@ The modernization is complete when all of the following are true:
 - legacy blockers have been replaced or removed
 - staging validation and production smoke validation pass
 - rollback is documented and rehearsed
-- the deployment shape is portable enough that a future ECS Fargate move would be mainly an infrastructure packaging exercise rather than another app rewrite
+- the deployment shape is portable enough that a future containerization or runtime packaging change would be mainly an infrastructure exercise rather than another app rewrite
