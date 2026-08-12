@@ -63,6 +63,12 @@ main {
     padding: 0.21429rem 1.57143rem;
   }
 }
+#nav-signin.login-menu-locked > #mega-menu-login {
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+}
 .g-bg-primary .dropdown-item:focus,
 .g-bg-primary .dropdown-item:hover,
 .g-bg-black .dropdown-item:focus,

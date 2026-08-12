@@ -1,4 +1,5 @@
 {% load static %}
+{% load compress %}
 {% load account socialaccount %}
 {% load cshc_tags %}
 
@@ -193,12 +194,12 @@
         </li>
         {% else %}
         {% get_providers as socialaccount_providers %}
-        <li class="hs-has-mega-menu nav-item g-mx-10--lg g-mx-15--xl" data-animation-in="fadeIn" data-animation-out="fadeOut" data-position="left">
+        <li id="nav-signin" class="hs-has-mega-menu nav-item g-mx-10--lg g-mx-15--xl" data-animation-in="fadeIn" data-animation-out="fadeOut" data-position="left">
           <a id="mega-menu-label-login" href="#" class="nav-link g-py-7 g-px-0" aria-haspopup="true" aria-expanded="false">Sign In
             <i class="hs-icon hs-icon-arrow-bottom g-font-size-11 g-ml-7"></i>
           </a>
-          <div class="w-100 g-bg-black hs-mega-menu u-shadow-v11 font-weight-normal g-brd-top g-brd-primary g-brd-top-2 g-mt-21 g-mt-11--lg--scrolling" aria-labelledby="mega-menu-label-login" style="display: none;">
-            <form class="g-pa-30" action="{% url 'account_login' %}" method="post">{% csrf_token %}
+          <div id="mega-menu-login" class="w-100 g-bg-black hs-mega-menu u-shadow-v11 font-weight-normal g-brd-top g-brd-primary g-brd-top-2 g-mt-21 g-mt-11--lg--scrolling" aria-labelledby="mega-menu-label-login" style="display: none;">
+            <form id="signin-menu-form" class="g-pa-30" action="{% url 'account_login' %}" method="post">{% csrf_token %}
               <input type="hidden" name="next" value="{{ request.get_full_path }}"/>
               <div class="g-max-width-780 mx-auto">
                 <div class="row">
@@ -208,7 +209,6 @@
                       <a class="g-color-white-opacity-0_8 g-color-white--hover" href="{% url 'account_signup' %}">Create a new account</a>
                     </small>
                   </div>
-        
                   <div class="col-lg-5 g-mb-20 g-mb-0--lg">
                     <input class="form-control g-color-white g-color-white--focus g-bg-transparent g-bg-transparent--focus g-brd-white-opacity-0_3 g-brd-white--focus g-py-13 g-px-15" type="password" name="password" placeholder="Password" tabindex="2">
                     <small class="d-block g-px-15 g-py-5">
@@ -255,3 +255,7 @@
     <!-- End Navigation -->
   </div>
 </nav>
+
+{% compress js %}
+<script type="text/javascript" src="{% static "js/nav-signinmenu.js" %}"></script>
+{% endcompress %}
