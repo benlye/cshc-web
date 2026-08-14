@@ -52,6 +52,7 @@ The target baseline for the modernized application is:
 - The application will be modernized on Elastic Beanstalk first.
 - The production modernization target is a current Elastic Beanstalk Docker platform on Amazon Linux.
 - Native Elastic Beanstalk Docker is preferred over installing Docker on a Python EB host because it preserves immutable CI-built artifacts and reduces host coupling.
+- Elastic Beanstalk Docker should be treated as able to run the club's custom application image together with third-party sidecar images through Docker Compose on each instance.
 - A hand-curated Ubuntu AMI or self-managed EC2 host build is not the target end state.
 - The legacy Ubuntu CloudFormation and Ansible automation is migration input only, not the basis of the future platform.
 - The modernization will avoid deepening dependence on old EB-specific behavior, old Ubuntu host assumptions, or source-build deployment behavior on the instance.
@@ -96,6 +97,7 @@ The modernized production architecture should be:
 - A CI-built application image deployed as the authoritative production artifact
 - Django served by `gunicorn` in an `app` container
 - `nginx` as a separate edge container for reverse proxying and HTTPS termination
+- Third-party sidecars such as `certbot` are acceptable in the Compose stack when they are instance-local operational helpers rather than shared application infrastructure
 - Self-hosted MySQL on a separate EC2 host in the same private network
 - Static and media assets stored in S3
 - TLS terminated in the application stack by `nginx` using ACME/Certbot-managed certificates, not committed certificate files in the repo
@@ -135,6 +137,7 @@ All modernization work should preserve a clean future path to containerization o
 - Migrations, static collection, and scheduled jobs are standalone commands that can be run in any compatible execution environment.
 - No production behavior depends on Apache-specific, Ubuntu-specific, or old EB Python host-path-specific configuration.
 - Application runtime assumptions stay compatible with a single-process container model even if production is not containerized yet.
+- Docker Compose on EB should be treated as a per-instance runtime only: every declared service runs on every instance, so shared stateful services such as MySQL must stay outside the EB web environment.
 
 ### Developer Workflow
 
@@ -195,6 +198,7 @@ Work:
 - Use Amazon Linux through the supported Elastic Beanstalk Docker platform rather than through a bespoke AMI strategy.
 - Remove hard-coded Elastic Beanstalk Python 3.6 paths from deployment configuration and startup scripts.
 - Introduce a container split of `app` and `nginx`, with a Certbot/ACME helper for lower-cost HTTPS termination when no ALB is present.
+- Treat Docker Compose services as per-instance sidecars: acceptable for `nginx`, `certbot`, and similar helpers, but not for shared stateful infrastructure such as MySQL.
 - Replace instance-local cron assumptions with a portable scheduling approach, with EventBridge Scheduler the preferred external trigger. If host cron is retained temporarily, the invoked command must still be environment-agnostic and standalone.
 - Move MySQL to a separate EC2 host rather than the production web host.
 - Lock the production environment to a deliberate single-instance web operating model while the database remains a separately managed single-instance host; do not assume autoscaling-safe stateless application instances.
@@ -388,6 +392,7 @@ Packages requiring explicit compatibility review during execution:
 - Stop deploying committed certificate and private key material.
 - Standardize startup, migration, and static collection commands.
 - Keep S3-backed storage for portability and operational simplicity.
+- Treat any sidecar cache such as `memcached` as instance-local only if introduced inside the EB Compose stack; do not rely on it as a shared cache across instances.
 
 ### Required Operational Changes
 
@@ -524,6 +529,7 @@ Any later migration of that kind should assume:
 - AWS-managed or equivalent secrets/configuration
 - operational commands that can run independently of host-specific layout
 - a database strategy chosen separately from the web runtime packaging decision
+- any helper containers are replaceable sidecars, not the home for shared stateful platform services
 
 The current modernization must therefore avoid reintroducing host-specific behavior that would complicate containerization or another deployment packaging change later.
 
