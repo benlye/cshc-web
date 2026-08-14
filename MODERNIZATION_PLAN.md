@@ -4,7 +4,7 @@
 
 This document is the working runbook for modernizing the Cambridge South Hockey Club website. The current application is a Django web app with a React/Webpack frontend and an AWS Elastic Beanstalk deployment shape that dates back to 2018. The codebase still reflects Python 3.6, Django 2.0, Node/Webpack/Babel 2017-era tooling, several unmaintained Python packages, and deployment assumptions tied to old Elastic Beanstalk Apache and mod_wsgi internals.
 
-The chosen path is to modernize the application on AWS Elastic Beanstalk first, because it is the lower-cost option for the club and avoids taking on unnecessary platform complexity during the dependency upgrade. The modernization must be done in a way that improves application portability and preserves a clean future path to containerization or other runtime changes if operational needs change.
+The chosen path is to modernize the application on AWS Elastic Beanstalk in a containerized form, because it preserves the lower-cost AWS posture while giving the club portable, definitive build artifacts from CI/CD. The modernization must be done in a way that improves application portability, keeps the database on a separate host, and preserves a clean future path to a different container platform if operational needs change.
 
 The target baseline for the modernized application is:
 
@@ -12,7 +12,7 @@ The target baseline for the modernized application is:
 - Django `4.2 LTS`
 - Node `20 LTS`
 - npm `10`
-- AWS Elastic Beanstalk on Amazon Linux with a modern Python platform and a portable application startup model
+- AWS Elastic Beanstalk Docker on Amazon Linux, with the app packaged as immutable container artifacts and started with a portable process model
 
 ## Current State Assessment
 
@@ -50,11 +50,12 @@ The target baseline for the modernized application is:
 
 - Production hosting remains on AWS.
 - The application will be modernized on Elastic Beanstalk first.
-- The production modernization target is a current Elastic Beanstalk Python platform on Amazon Linux.
+- The production modernization target is a current Elastic Beanstalk Docker platform on Amazon Linux.
+- Native Elastic Beanstalk Docker is preferred over installing Docker on a Python EB host because it preserves immutable CI-built artifacts and reduces host coupling.
 - A hand-curated Ubuntu AMI or self-managed EC2 host build is not the target end state.
 - The legacy Ubuntu CloudFormation and Ansible automation is migration input only, not the basis of the future platform.
-- The modernization will avoid deepening dependence on old EB-specific behavior or old Ubuntu host assumptions.
-- Future containerized deployment remains an option, but no specific future runtime platform is locked in by this plan.
+- The modernization will avoid deepening dependence on old EB-specific behavior, old Ubuntu host assumptions, or source-build deployment behavior on the instance.
+- Future moves to ECS/Fargate or another container platform remain options because the deployable unit will be a CI-built image rather than an instance-built application tree.
 - EKS is explicitly out of scope because it is too operationally and financially heavy for this use case.
 
 ### Accepted Platform Tradeoffs
@@ -81,22 +82,26 @@ The target baseline for the modernized application is:
 ### Chosen Database Strategy
 
 - Production will remain on MySQL during this modernization rather than combining the Django upgrade with a database-engine migration.
-- The target production database platform is a self-hosted MySQL instance on the production Amazon Linux host, not Amazon RDS.
+- The target production database platform is a self-hosted MySQL instance on a separate EC2 host, not on the web host and not Amazon RDS.
 - The default cost posture is a single-instance design that accepts manual recovery work in exchange for avoiding the recurring RDS cost.
 - PostgreSQL remains a valid future option in Django, but moving to it is explicitly out of scope for this modernization because it would add avoidable migration risk.
-- SQLite remains acceptable for lightweight local development, but production-significant validation must run against MySQL and not rely only on SQLite behavior.
+- SQLite remains acceptable for lightweight local development, but production-significant validation must run against MySQL in CI and staging and not rely only on SQLite behavior.
+- Staging may temporarily share the MySQL host as a separate database and credential set if cost forces it, but development environments must not use the shared remote MySQL host.
 
 ## Target Architecture
 
 The modernized production architecture should be:
 
-- AWS Elastic Beanstalk on a current Amazon Linux Python platform
-- Django served by `gunicorn`
-- Self-hosted MySQL on the production Amazon Linux host
+- AWS Elastic Beanstalk Docker on Amazon Linux
+- A CI-built application image deployed as the authoritative production artifact
+- Django served by `gunicorn` in an `app` container
+- `nginx` as a separate edge container for reverse proxying and HTTPS termination
+- Self-hosted MySQL on a separate EC2 host in the same private network
 - Static and media assets stored in S3
-- TLS terminated on the host using Certbot-managed certificates, not committed certificate files in the repo
+- TLS terminated in the application stack by `nginx` using ACME/Certbot-managed certificates, not committed certificate files in the repo
+- Certificate state stored on host-mounted persistent storage on the EB instance, not in the image and not on S3
 - Secrets stored in AWS-managed configuration or secret storage
-- Scheduled jobs invoked through portable operational commands, not instance-specific path assumptions
+- Scheduled jobs invoked through portable operational commands, with EventBridge Scheduler the most likely preferred external trigger
 
 ### Database Strategy
 
@@ -104,17 +109,20 @@ The modernized production architecture should be:
 - Use a current supported MySQL driver for modern Django, with `mysqlclient` as the default implementation choice unless execution uncovers a concrete blocker.
 - Standardize on modern MySQL defaults appropriate for Django, including `InnoDB` and `utf8mb4`, rather than preserving legacy `MyISAM` assumptions.
 - Remove the current migration-time `default_storage_engine=MyISAM` workaround during backend modernization after verifying all historical migrations and schema behavior on the target MySQL version.
-- Keep the database host-local and cost-optimized for now, with Amazon RDS treated as a future operational upgrade path rather than the default target.
+- Keep the database on a dedicated low-cost EC2 host for now, with Amazon RDS treated as a future operational upgrade path rather than the default target.
 - Do not treat MariaDB as an automatic drop-in choice; if MySQL compatibility questions arise, prefer remaining on self-hosted MySQL unless cost or operational pressure forces a managed-service change.
 - Recognize Django's modern supported database backends as PostgreSQL, MariaDB, MySQL, Oracle, and SQLite, but treat MySQL as the locked production target for this migration.
 - Continue using the existing S3-backed logical backup approach through `django-dbbackup`; this is not built into Django itself and must remain explicitly configured and validated.
 
 ### Certificate Strategy
 
-- The preferred certificate model for the current single-host production design is Certbot-managed certificates on the instance.
-- This is the lower-cost and more practical HTTPS model while production remains single-instance and host-centric.
+- The preferred certificate model for the current cost-first containerized production design is `nginx` plus a Certbot/ACME helper container on the instance.
+- This is the lower-cost and more practical HTTPS model while production remains single-instance and avoids the recurring cost of an ALB.
 - Certificate issuance, renewal, and deployment must be automated and documented; do not keep private key or certificate material committed in the repository.
-- Instance-local certificate issuance and renewal increase host customization, replacement complexity, and future migration effort, especially for any later move to a containerized or more stateless deployment model.
+- Instance-local certificate issuance and renewal still increase customization and future migration effort, so the certificate state must live outside the application image and be treated as runtime data.
+- The certificate working set should live on host-mounted persistent storage backed by the EB instance filesystem/EBS volume so it survives container restarts and normal deployments on that instance.
+- S3 is not the live certificate store; it may be used only for backup/export if needed because it is not a suitable shared filesystem for `certbot` and `nginx`.
+- Because this storage is tied to a single instance, backup and recovery procedures for certificate material must be documented and rehearsed alongside instance replacement procedures.
 - If a load balancer is introduced later, the preferred follow-on model is AWS Certificate Manager with TLS terminated at an Application Load Balancer rather than continuing to manage certificates on the host.
 
 ### Portability Rules
@@ -123,16 +131,16 @@ All modernization work should preserve a clean future path to containerization o
 
 - Application configuration comes from environment variables and secret stores only.
 - Static and media assets do not depend on local instance storage.
-- The app starts with a standard process command such as `gunicorn cshc.wsgi`.
+- The app starts with a standard process command such as `gunicorn cshc.wsgi:application`.
 - Migrations, static collection, and scheduled jobs are standalone commands that can be run in any compatible execution environment.
-- No production behavior depends on Apache-specific, Ubuntu-specific, or host-path-specific configuration.
+- No production behavior depends on Apache-specific, Ubuntu-specific, or old EB Python host-path-specific configuration.
 - Application runtime assumptions stay compatible with a single-process container model even if production is not containerized yet.
 
 ### Developer Workflow
 
-- Local development remains containerized and should continue to work well on Windows with Docker Desktop and WSL2.
-- Local development should track runtime parity rather than OS parity: Python `3.12`, Node `20`, the same app dependencies, and the same operational commands where practical.
-- Local development does not need to run Amazon Linux; Debian-based or Ubuntu-based development containers are acceptable if they reproduce the required application behavior.
+- Local development may continue to use SQLite for convenience rather than a local MySQL container.
+- Local development should track application behavior where practical, but production-significant migration and smoke validation must still run against MySQL in CI and staging.
+- Production-like container orchestration should still exist locally for deployment rehearsal and operational validation.
 - If OS-specific packaging concerns need validation, handle that in CI or a separate parity image rather than making Amazon Linux the default developer environment.
 - Choosing Amazon Linux on Elastic Beanstalk now does not materially block later containerization or another deployment packaging model, provided host-specific behavior continues to be removed.
 
@@ -176,27 +184,28 @@ Exit criteria:
 
 Goals:
 
-- remove Python 3.6 and Apache/mod_wsgi coupling
-- remove dependence on the legacy Ubuntu host build shape
-- modernize the deployment shape before major dependency upgrades
-- keep EB, but make the app runtime portable
+- remove Apache/mod_wsgi coupling and old EB Python host assumptions
+- move the web tier to a containerized runtime before major dependency upgrades
+- keep EB, but make the deployable unit a CI-built image
+- separate the database from the web host
 
 Work:
 
-- Replace the current custom Apache/mod_wsgi-centric deployment shape with the supported EB Python process model using `gunicorn`.
-- Use Amazon Linux through the supported Elastic Beanstalk platform rather than through a bespoke AMI strategy.
-- Remove hard-coded Elastic Beanstalk Python 3.6 paths from deployment configuration.
-- Retain instance-local TLS termination with Certbot as the default for the low-cost single-host design, but modernize the configuration so certificate issuance, renewal, and deployment are automated and documented.
-- Replace instance-local cron assumptions with a portable scheduling approach. If EB-hosted scheduling is retained temporarily, the invoked command must still be environment-agnostic and standalone.
-- Install and manage MySQL as a host service on the production Amazon Linux instance rather than introducing RDS as part of this modernization.
-- Lock the production environment to a deliberate single-instance operating model while the database remains host-local; do not assume autoscaling-safe stateless application instances.
-- Ensure the application can be started, migrated, and collected with explicit commands without relying on Apache configuration side effects.
-- Do not port the current Ubuntu Apache/mod_wsgi/Certbot/cron shape to Amazon Linux; replace that host-centric model with the minimum supported Elastic Beanstalk runtime model.
+- Replace the current custom Apache/mod_wsgi-centric deployment shape with EB Docker, with the app started by `gunicorn`.
+- Use Amazon Linux through the supported Elastic Beanstalk Docker platform rather than through a bespoke AMI strategy.
+- Remove hard-coded Elastic Beanstalk Python 3.6 paths from deployment configuration and startup scripts.
+- Introduce a container split of `app` and `nginx`, with a Certbot/ACME helper for lower-cost HTTPS termination when no ALB is present.
+- Replace instance-local cron assumptions with a portable scheduling approach, with EventBridge Scheduler the preferred external trigger. If host cron is retained temporarily, the invoked command must still be environment-agnostic and standalone.
+- Move MySQL to a separate EC2 host rather than the production web host.
+- Lock the production environment to a deliberate single-instance web operating model while the database remains a separately managed single-instance host; do not assume autoscaling-safe stateless application instances.
+- Ensure the application can be started, migrated, and collected with explicit commands without relying on Apache configuration side effects or instance-built source trees.
+- Do not port the current Ubuntu Apache/mod_wsgi/Certbot/cron shape to Amazon Linux; replace that host-centric model with the minimum supported container runtime model.
 - Treat the legacy Ubuntu CloudFormation and Ansible automation as reference material for inventory and migration only, not as implementation to be updated in place.
-- Do not treat Certbot as a short-term exception in the single-host design; treat it as the intentional low-cost default until the deployment model changes.
+- Do not treat the in-stack ACME/Certbot model as a short-term exception in the cost-first design; treat it as the intentional low-cost default until the deployment model changes.
 - Remove committed private key and certificate material from the repository and document certificate issuance, renewal, and rotation ownership.
+- Define the EB host-mounted certificate volume layout and document backup/export and restore/import procedures for certificate state.
 - Rationalize EB hooks and container commands to the minimum required deployment behavior.
-- Document database startup, backup, restore, and rebuild procedures as first-class host operations.
+- Document database startup, backup, restore, and rebuild procedures as first-class operations for the separate MySQL host.
 
 Exit criteria:
 
@@ -374,6 +383,8 @@ Packages requiring explicit compatibility review during execution:
 
 - Move off the current Python 3.6-targeted EB configuration.
 - Stop relying on custom Apache/mod_wsgi files in `.ebextensions`.
+- Stop relying on instance-side source builds as the deployment artifact.
+- Standardize on a container image as the release unit and ECR as the default registry choice, with GHCR or Docker Hub as acceptable alternatives if cost or lock-in concerns outweigh the AWS integration benefit.
 - Stop deploying committed certificate and private key material.
 - Standardize startup, migration, and static collection commands.
 - Keep S3-backed storage for portability and operational simplicity.
@@ -381,11 +392,12 @@ Packages requiring explicit compatibility review during execution:
 ### Required Operational Changes
 
 - Validate database migration strategy against production data.
-- Accept that database and web host responsibilities are intentionally coupled in the low-cost target design, and document the recovery implications clearly.
-- Rehearse restoring the S3-backed MySQL dump onto a rebuilt host rather than relying on managed database recovery features.
-- Monitor disk, memory, and restart behavior closely because Django, MySQL, cron jobs, and any local cache will share one instance.
+- Accept that the separate MySQL host is still a single-instance cost-optimized service, and document the recovery implications clearly.
+- Rehearse restoring the S3-backed MySQL dump onto a rebuilt MySQL host rather than relying on managed database recovery features.
+- Monitor disk, memory, and restart behavior on both the web host and the MySQL host, with particular attention to TLS sidecar state and any local cache choice.
 - Validate S3 media and static access patterns after storage backend migration.
-- Ensure the scheduled job mechanism is explicit and documented.
+- Ensure the scheduled job mechanism is explicit and documented, with EventBridge Scheduler the default design target.
+- Ensure certificate backup/export and recovery/import are explicit and documented because EB host-mounted cert storage is persistent only for the lifetime of that instance.
 - Ensure error reporting continues to work after the move from `raven`.
 - Ensure the club can continue routine admin/content work without retraining on a bespoke new platform.
 
@@ -459,7 +471,7 @@ Mitigation:
 
 - keep reliable nightly logical backups in S3
 - rehearse restore onto a fresh host
-- avoid multi-instance or autoscaling assumptions while the database is host-local
+- avoid multi-instance or autoscaling assumptions while the database remains a separately managed single-instance service
 - size the host for combined web and database load rather than for Django alone
 
 ### Risk: Frontend Toolchain Churn
@@ -489,6 +501,7 @@ Minimum rollback components:
 
 - verified pre-release database backup
 - previous known-good application artifact or deployment version
+- clear procedure for restoring certificate state onto a rebuilt or replacement EB instance when using in-stack Certbot storage
 - clear procedure for restoring app and database independently if needed
 - decision point for aborting the release if post-deploy smoke tests fail
 
@@ -521,10 +534,13 @@ These items should be answered or confirmed before execution begins:
 - the exact current production database version
 - the current database storage engine, charset, and collation defaults
 - the current database data path, persistence model, and available disk headroom on the production host
-- whether the chosen Amazon Linux instance size remains viable once MySQL runs on the same host as Django and scheduled jobs
+- whether the chosen Amazon Linux web instance size remains viable once the app, reverse proxy, and ACME helper share the same host
+- whether the chosen MySQL instance size remains viable once staging is either separated or temporarily co-located as a second database on the same server
 - whether production still includes any unmanaged Ubuntu 18.04 host outside the repo-defined EB flow
 - current TLS termination path and DNS ownership details
+- the intended host-mounted storage path and backup/export method for in-stack certificate state
 - whether memcached should be retained or replaced during modernization
+- whether ECR remains the preferred registry once current AWS pricing is reviewed against GHCR or Docker Hub
 - whether `django-blog-zinnia` has a viable Django 4.2-compatible path or should be replaced
 - whether Flow should be removed entirely during frontend modernization
 - what level of automated test coverage can be added before Phase 2 begins
@@ -533,7 +549,7 @@ These items should be answered or confirmed before execution begins:
 
 The modernization is complete when all of the following are true:
 
-- production runs on a modern AWS Elastic Beanstalk Python platform
+- production runs on a modern AWS Elastic Beanstalk Docker platform
 - the app runs on Python `3.12`
 - the app runs on Django `4.2 LTS`
 - the frontend builds on Node `20`
