@@ -54,7 +54,7 @@ The target baseline for the modernized application is:
 - Native Elastic Beanstalk Docker is preferred over installing Docker on a Python EB host because it preserves immutable CI-built artifacts and reduces host coupling.
 - Elastic Beanstalk Docker should be treated as able to run the club's custom application image together with third-party sidecar images through Docker Compose on each instance.
 - A hand-curated Ubuntu AMI or self-managed EC2 host build is not the target end state.
-- The legacy Ubuntu CloudFormation and Ansible automation is migration input only, not the basis of the future platform.
+- The existing CloudFormation and Ansible automation remains useful, but its responsibilities must narrow: CloudFormation should continue to define infrastructure, and Ansible should focus on the separate MySQL host and generic host bootstrap rather than webapp runtime deployment.
 - The modernization will avoid deepening dependence on old EB-specific behavior, old Ubuntu host assumptions, or source-build deployment behavior on the instance.
 - Future moves to ECS/Fargate or another container platform remain options because the deployable unit will be a CI-built image rather than an instance-built application tree.
 - EKS is explicitly out of scope because it is too operationally and financially heavy for this use case.
@@ -65,6 +65,7 @@ The target baseline for the modernized application is:
 - Some Ubuntu-specific operator familiarity will be lost, including `apt`, `apache2`, and other Debian-style package and service conventions.
 - The chosen path is somewhat more AWS-aligned operationally, but that tradeoff is acceptable because the goal is to simplify deployment on Elastic Beanstalk rather than preserve a generic hand-built host model.
 - The current Ubuntu automation includes `apt`, `apache2`, the `ubuntu` SSH user, Certbot on the instance, local MySQL, cron, and `mod_wsgi`; carrying that model forward would turn the modernization into an OS maintenance project instead of an application modernization.
+- The old automation model should be split rather than discarded wholesale: infrastructure automation is still valuable, but host-managed webapp deployment is not the target steady state for the new EB Docker stack.
 - For the current single-host cost target, instance-local Certbot is the preferred TLS model; ACM on an Application Load Balancer remains a later option if the site moves to a load-balanced or more stateless deployment shape.
 
 ### Chosen Upgrade Strategy
@@ -104,6 +105,7 @@ The modernized production architecture should be:
 - Certificate state stored on host-mounted persistent storage on the EB instance, not in the image and not on S3
 - Secrets stored in AWS-managed configuration or secret storage
 - Scheduled jobs invoked through portable operational commands, with EventBridge Scheduler the most likely preferred external trigger
+- CloudFormation retained for AWS infrastructure definition, and Ansible retained only where a host must still be configured directly, especially the MySQL host
 
 ### Database Strategy
 
@@ -155,18 +157,28 @@ Goals:
 
 - capture the current production shape
 - reduce rollout risk before version upgrades
-- create a staging environment for validation
+- lock the inputs required to execute Phase 1 safely
 
 Work:
 
+- Use [PHASE_0_DISCOVERY_WORKBOOK.md](/C:/Users/blye/Repos/Other/cshc-web/PHASE_0_DISCOVERY_WORKBOOK.md) as the step-by-step capture document for this phase.
 - Inventory all required production environment variables.
 - Inventory AWS resources and host responsibilities in use: Elastic Beanstalk environment, S3 buckets, DNS, TLS termination, cron-equivalent jobs, any cache services, and any host-level MySQL service assumptions.
+- Inventory the existing `cshc-web-automation` CloudFormation and Ansible responsibilities and classify them as `keep for infra`, `keep for DB host`, or `retire from webapp deployment`.
 - Confirm production database engine/version and backup/restore process.
 - Confirm production database storage engine, charset, and collation defaults so the MyISAM-era assumptions can be removed safely.
 - Confirm the current database data path, disk allocation, and restart behavior so host-local persistence expectations are explicit before implementation.
+- Record current database size and representative row counts so import validation has a baseline.
 - Confirm current static/media bucket layout and retention expectations.
+- Confirm current TLS termination path and DNS ownership.
 - Document all management commands used operationally, including `nightly_tasks`, `collectstatic`, `compress`, and migrations.
-- Create a staging environment on the target EB platform before production cutover.
+- Rehearse restoring the current production backup onto a disposable MySQL instance and record the exact restore procedure, timing, and gaps.
+- Produce explicit Phase 1 inputs covering DB version strategy, host OS choice, initial sizing assumptions, and backup/export ownership.
+- Capture the discovery outputs as reusable execution artifacts:
+  - production environment and resource inventory
+  - database baseline and collation audit
+  - automation retain/rewrite/retire matrix
+  - backup and restore validation notes
 - Add a minimum smoke test suite that covers:
   - homepage
   - authentication flow
@@ -174,14 +186,16 @@ Work:
   - GraphQL endpoint
   - one representative React-backed page
   - one scheduled management command entrypoint
-- Add CI to run dependency install, Django checks, migrations, tests, and frontend build.
+- Add minimal CI or equivalent repeatable validation to run dependency install, Django checks, the smoke suite, and the frontend build where the current stack still allows it.
 
 Exit criteria:
 
-- staging environment exists
-- smoke suite exists and runs in CI
-- backup and restore process is documented and validated
-- required env vars and AWS resources are documented
+- required env vars, AWS resources, TLS ownership, and scheduled jobs are documented
+- current production MySQL version, engine usage, charset/collation state, data size, data path, and persistence model are documented
+- CloudFormation and Ansible responsibilities are classified into retain/rewrite/retire buckets
+- current backup path is documented and a restore rehearsal has succeeded
+- smoke suite exists and runs in a repeatable validation path
+- Phase 1 inputs are locked and recorded
 
 ### Phase 1: Deployment Portability and Elastic Beanstalk Cleanup
 
@@ -194,28 +208,43 @@ Goals:
 
 Work:
 
+- Execute the separate MySQL host build first, using [MYSQL_HOST_SETUP.md](/C:/Users/blye/Repos/Other/cshc-web/MYSQL_HOST_SETUP.md) as the detailed runbook for provisioning, import, charset/collation cleanup, and recovery validation.
+- Rework the existing CloudFormation stack so it provisions the separate MySQL host infrastructure: instance, security group rules, storage, DNS if used, and any required IAM access for backup/export tooling.
+- Rework or add Ansible automation for the MySQL host so it installs the chosen MySQL version, applies the target server defaults, enables the service, and configures repeatable host bootstrap.
+- Create the application database and least-privilege database user on the new host and validate private-network connectivity from the web tier.
+- Import a representative database dump onto the new host and perform the first-pass engine, charset, and collation audit there.
+- Stand up and validate the backup/export path for the new MySQL host before treating it as ready for staging or production use.
+- Validate app connectivity and basic management commands against the new host before continuing with web-tier portability work.
 - Replace the current custom Apache/mod_wsgi-centric deployment shape with EB Docker, with the app started by `gunicorn`.
 - Use Amazon Linux through the supported Elastic Beanstalk Docker platform rather than through a bespoke AMI strategy.
 - Remove hard-coded Elastic Beanstalk Python 3.6 paths from deployment configuration and startup scripts.
 - Introduce a container split of `app` and `nginx`, with a Certbot/ACME helper for lower-cost HTTPS termination when no ALB is present.
 - Treat Docker Compose services as per-instance sidecars: acceptable for `nginx`, `certbot`, and similar helpers, but not for shared stateful infrastructure such as MySQL.
 - Replace instance-local cron assumptions with a portable scheduling approach, with EventBridge Scheduler the preferred external trigger. If host cron is retained temporarily, the invoked command must still be environment-agnostic and standalone.
-- Move MySQL to a separate EC2 host rather than the production web host.
 - Lock the production environment to a deliberate single-instance web operating model while the database remains a separately managed single-instance host; do not assume autoscaling-safe stateless application instances.
 - Ensure the application can be started, migrated, and collected with explicit commands without relying on Apache configuration side effects or instance-built source trees.
 - Do not port the current Ubuntu Apache/mod_wsgi/Certbot/cron shape to Amazon Linux; replace that host-centric model with the minimum supported container runtime model.
-- Treat the legacy Ubuntu CloudFormation and Ansible automation as reference material for inventory and migration only, not as implementation to be updated in place.
+- Rework the existing CloudFormation stack toward the new infrastructure shape, but do not keep using Ansible as the mechanism for deploying the web application onto the EB hosts.
+- Narrow Ansible to MySQL host provisioning, generic host hardening, backup setup, and other direct host responsibilities that still exist after the web tier becomes containerized.
 - Do not treat the in-stack ACME/Certbot model as a short-term exception in the cost-first design; treat it as the intentional low-cost default until the deployment model changes.
 - Remove committed private key and certificate material from the repository and document certificate issuance, renewal, and rotation ownership.
 - Define the EB host-mounted certificate volume layout and document backup/export and restore/import procedures for certificate state.
 - Rationalize EB hooks and container commands to the minimum required deployment behavior.
 - Document database startup, backup, restore, and rebuild procedures as first-class operations for the separate MySQL host.
+- Create the staging environment on the target EB Docker platform only after the separate MySQL host has passed import, audit, backup, restore, and app-connectivity validation.
 
 Exit criteria:
 
+- separate MySQL host infrastructure is provisioned through automation and can be rebuilt repeatably
+- MySQL service is installed, configured, and reachable privately from the web tier
+- application database and DB user exist on the new host and have been validated from the app side
+- representative dump import succeeds on the new host and the initial engine/charset/collation audit is complete
+- backup/export and restore procedure for the new MySQL host is documented and tested at least once
+- app-level validation against the new host succeeds before staging work continues
 - app starts under `gunicorn`
 - staging deploy works without Apache/mod_wsgi customization
 - migrations and static collection run as explicit commands
+- staging on the target EB Docker platform exists only after the separate MySQL host is validated
 - no committed private key or certificate material remains part of the live deployment design
 
 ### Phase 2: Backend Modernization
@@ -389,6 +418,8 @@ Packages requiring explicit compatibility review during execution:
 - Stop relying on custom Apache/mod_wsgi files in `.ebextensions`.
 - Stop relying on instance-side source builds as the deployment artifact.
 - Standardize on a container image as the release unit and ECR as the default registry choice, with GHCR or Docker Hub as acceptable alternatives if cost or lock-in concerns outweigh the AWS integration benefit.
+- Rework the existing CloudFormation stack so it owns the new infrastructure boundaries: EB Docker environment, separate MySQL EC2 host, security groups, storage, and DNS.
+- Stop treating the existing Ansible webapp role as the deployment path for the site runtime on the web tier.
 - Stop deploying committed certificate and private key material.
 - Standardize startup, migration, and static collection commands.
 - Keep S3-backed storage for portability and operational simplicity.
@@ -399,6 +430,7 @@ Packages requiring explicit compatibility review during execution:
 - Validate database migration strategy against production data.
 - Accept that the separate MySQL host is still a single-instance cost-optimized service, and document the recovery implications clearly.
 - Rehearse restoring the S3-backed MySQL dump onto a rebuilt MySQL host rather than relying on managed database recovery features.
+- Use Ansible for repeatable MySQL host bootstrap and ongoing direct-host tasks such as package installation, MySQL configuration, backup setup, and baseline hardening.
 - Monitor disk, memory, and restart behavior on both the web host and the MySQL host, with particular attention to TLS sidecar state and any local cache choice.
 - Validate S3 media and static access patterns after storage backend migration.
 - Ensure the scheduled job mechanism is explicit and documented, with EventBridge Scheduler the default design target.
@@ -468,16 +500,16 @@ Mitigation:
 - inventory AWS resources and production settings before implementation
 - validate staging against observed production behavior rather than repo assumptions alone
 
-### Risk: Host-Local Database Coupling
+### Risk: Single-Instance Database Host
 
-Running MySQL on the same host as Django reduces cost but couples application availability, database availability, and instance lifecycle.
+Keeping MySQL on its own low-cost single EC2 host avoids web-host coupling, but it still leaves the data tier without managed failover and makes recovery quality dependent on automation and backup discipline.
 
 Mitigation:
 
 - keep reliable nightly logical backups in S3
 - rehearse restore onto a fresh host
 - avoid multi-instance or autoscaling assumptions while the database remains a separately managed single-instance service
-- size the host for combined web and database load rather than for Django alone
+- size the MySQL host with recovery headroom, not only steady-state load in mind
 
 ### Risk: Frontend Toolchain Churn
 
@@ -535,7 +567,7 @@ The current modernization must therefore avoid reintroducing host-specific behav
 
 ## Open Questions and Prerequisites
 
-These items should be answered or confirmed before execution begins:
+These items should be answered or confirmed during Phase 0 before Phase 1 begins:
 
 - the exact current production database version
 - the current database storage engine, charset, and collation defaults
