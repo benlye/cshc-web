@@ -5,17 +5,19 @@ import Urls from 'util/urls';
 import { Subheading, Panel } from 'components/Unify';
 import CommitteeMemberships from './CommitteeMemberships';
 import EndOfSeasonAwards from './EndOfSeasonAwards';
+import Captaincies from './Captaincies';
 import MemberRecentMatches from './MemberRecentMatches';
 import MemberRecentReports from './MemberRecentReports';
 
 /**
  * Top-level component for a member's Club Involvement.
- * 
+ *
  * Contains the following sections:
  * 1) Recent Matches
  * 2) Committee Positions
  * 3) End of Season awards
- * 4) Recent Match Reports written by this member
+ * 4) Captaincies held by this member
+ * 5) Recent Match Reports written by this member
  */
 const MemberClubInvolvement = ({ member }) => {
   const panelProps = { outlineColor: 'teal', headerColor: 'teal' };
@@ -72,6 +74,17 @@ const MemberClubInvolvement = ({ member }) => {
                 winners for that year.
               </p>
               <EndOfSeasonAwards memberId={member.id} />
+            </div>
+          </Panel>
+        </div>
+        <div className="col-md-6 g-mb-20">
+          <Panel className="g-mb-0 g-height-100x" title="Captaincies" {...panelProps}>
+            <div className="card-block">
+              <p>
+                Teams that {member.firstName} has captained or vice-captained. Click on a team to
+                see the full squad for that team.
+              </p>
+              <Captaincies memberId={member.id} />
             </div>
           </Panel>
         </div>

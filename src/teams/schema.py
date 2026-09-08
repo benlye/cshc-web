@@ -51,6 +51,9 @@ class TeamCaptaincyType(DjangoObjectType):
     """ GraphQL node representing a club team (vice-)captaincy for a particular team and season """
     class Meta:
         model = TeamCaptaincy
+        filter_fields = {
+            'member_id': ['exact'],
+        }
 
 
 class TeamCaptaincyList(DjangoListObjectType):
