@@ -10,5 +10,69 @@
   $(document).on('ready', function () {
     // initialization of parallax
     $('.dzsparallaxer').dzsparallaxer();
+
+    // The parallax plugin runs a 2-second autocheck timer that recomputes the
+    // hero's offsetTop and rewrites the target's transform. When the mobile
+    // nav collapse expands, the hero shifts down but nothing recalculates
+    // immediately — up to ~2.2s later the autocheck fires and the plugin
+    // snaps the image to a new offset. That reads as a "delayed jump".
+    //
+    // The plugin writes the transform via jQuery .css(), which assigns
+    // element.style.transform directly — an assignment that clears any
+    // !important priority we might set on the inline style. So we can't beat
+    // it with CSS alone. Instead, watch the target's style attribute with a
+    // MutationObserver and re-pin the transform to its frozen value every
+    // time the plugin rewrites it. Observer callbacks run as microtasks
+    // between the plugin's rAF write and the browser paint, so the "wrong"
+    // value never becomes visible.
+    var observers = [];
+    var unfreezeTimer = null;
+
+    function freezeParallax() {
+      clearTimeout(unfreezeTimer);
+      if (observers.length) return;
+      $('.dzsparallaxer--target').each(function () {
+        var target = this;
+        var frozen = getComputedStyle(target).transform;
+        if (frozen === 'none') frozen = 'matrix(1, 0, 0, 1, 0, 0)';
+        target.style.transform = frozen;
+        var observer = new MutationObserver(function () {
+          if (target.style.transform === frozen) return;
+          observer.disconnect();
+          target.style.transform = frozen;
+          observer.observe(target, { attributes: true, attributeFilter: ['style'] });
+        });
+        observer.observe(target, { attributes: true, attributeFilter: ['style'] });
+        observers.push(observer);
+      });
+    }
+
+    function unfreezeParallax() {
+      if (!observers.length) return;
+      while (observers.length) observers.pop().disconnect();
+      // The frozen transform rarely matches the plugin's target on the very
+      // next frame — releasing the pin would snap the image. A short
+      // transition lets the browser interpolate from the frozen value to the
+      // plugin's next write, then we clear it so scrolling stays 1:1.
+      $('.dzsparallaxer--target').each(function () {
+        var el = this;
+        el.style.transition = 'transform 500ms ease-out';
+        setTimeout(function () {
+          el.style.transition = '';
+        }, 600);
+      });
+    }
+
+    $(document).on('click', '.navbar-toggler[data-target="#navBar"]', freezeParallax);
+    $('#navBar').on('hidden.bs.collapse', function () {
+      clearTimeout(unfreezeTimer);
+      // Force the plugin to refresh its cached offsetTop for the now-restored
+      // layout. Then keep pinning while its internal target position eases
+      // toward the correct value (plugin schedules a scroll recompute 200ms
+      // after resize, then handle_frame eases over ~20 frames ≈ 300ms).
+      // Releasing only after convergence prevents the visible jump-then-scroll.
+      $(window).trigger('resize');
+      unfreezeTimer = setTimeout(unfreezeParallax, 2000);
+    });
   });
 </script>
