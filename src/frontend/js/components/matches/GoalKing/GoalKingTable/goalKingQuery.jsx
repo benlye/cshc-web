@@ -10,6 +10,7 @@ export const GOAL_KING_QUERY = gql`
         member {
           firstName
           lastName
+          isAnonymized
           gender
           id
         }

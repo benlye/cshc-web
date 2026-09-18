@@ -28,6 +28,7 @@ export const EOS_LIST_QUERY = gql`
           id
           firstName
           lastName
+          isAnonymized
         }
         comment
         season {

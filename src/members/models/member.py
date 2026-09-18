@@ -23,6 +23,12 @@ from members import settings as member_settings
 
 LOG = logging.getLogger(__name__)
 
+# Display names used when a member has opted to be anonymous on the public website
+ANONYMOUS_FULL = "Anonymous Player"
+ANONYMOUS_SHORT = "Anonymous"
+ANONYMOUS_FIRST = "Anonymous"
+ANONYMOUS_LAST = "Player"
+
 
 @receiver(email_changed)
 def on_email_change(sender, **kwargs):
@@ -109,6 +115,11 @@ class Member(models.Model):
     is_umpire = models.NullBooleanField(
         "Umpire?", null=True, blank=True, default=False, help_text='Is this member a qualified hockey umpire (including probationer)?')
     """ Indicates whether this member is a umpire """
+
+    anonymous = models.BooleanField(
+        "Anonymous", default=False,
+        help_text="If set, this member is shown as 'Anonymous Player' on the public website")
+    """ Indicates whether this member should be anonymized on the public website """
 
     dob = models.DateField(
         'Date of birth', help_text="Used for medical information", null=True, blank=True)
@@ -217,6 +228,22 @@ class Member(models.Model):
     def first_name_and_initial(self):
         """ Returns the shortened name display for this member."""
         return u"{} {}".format(self.pref_first_name(), self.last_name[0])
+
+    def public_pref_first_name(self):
+        """ Returns the member's preferred first name, anonymized for public display if requested. """
+        return ANONYMOUS_FIRST if self.anonymous else self.pref_first_name()
+
+    def public_last_name(self):
+        """ Returns the member's last name, anonymized for public display if requested. """
+        return ANONYMOUS_LAST if self.anonymous else self.last_name
+
+    def public_full_name(self):
+        """ Returns the member's full name, anonymized for public display if requested. """
+        return ANONYMOUS_FULL if self.anonymous else self.full_name()
+
+    def public_first_name_and_initial(self):
+        """ Returns the member's shortened name, anonymized for public display if requested. """
+        return ANONYMOUS_SHORT if self.anonymous else self.first_name_and_initial()
 
     @property
     def address_known(self):

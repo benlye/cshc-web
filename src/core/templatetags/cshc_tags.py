@@ -218,6 +218,8 @@ def profile_pic(member, size, className):
         'width': size_split[0] + 'px',
         'height': size_split[1] + 'px',
         'fallbackImage': fallback_image_url,
+        # Anonymous members' photos are hidden from public pages - fall back to the generic avatar
+        'show_profile_pic': bool(member and member.profile_pic and not member.anonymous),
     }
 
 

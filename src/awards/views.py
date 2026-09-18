@@ -19,8 +19,13 @@ class EndOfSeasonAwardWinnersView(TemplateView):
             'season__slug', flat=True).distinct())
         award_list = list(EndOfSeasonAward.objects.order_by('name').values(
             'name', 'id').distinct())
-        awardee_list = list(Member.objects.filter(awards_endofseasonawardwinner_awards__isnull=False).values(
-            'first_name', 'last_name', 'id').distinct())
+        # Build the awardee filter list from Member instances so that anonymous members
+        # are shown as "Anonymous Player" rather than by their real name.
+        awardee_list = [
+            {'id': m.id, 'first_name': m.public_pref_first_name(), 'last_name': m.public_last_name()}
+            for m in Member.objects.filter(
+                awards_endofseasonawardwinner_awards__isnull=False).distinct()
+        ]
         context['props'] = {
             'seasons': season_list,
             'awards': award_list,

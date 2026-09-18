@@ -12,7 +12,7 @@ Expects context containing:
       <a title="View profile" href="{{ app.member.get_absolute_url }}">
         <div class="d-flex align-items-center g-mb-20">
           {% profile_pic member=app.member size="60x60" className="flex-2 g-pr-10" %}
-          <h4 class="flex-3 ellipsize g-font-size-18 g-font-size-18--md g-font-size-16--lg g-font-weight-600 mb-1">{{ app.member.pref_first_name}}<br/>{{ app.member.last_name}}</h4>
+          <h4 class="flex-3 ellipsize g-font-size-18 g-font-size-18--md g-font-size-16--lg g-font-weight-600 mb-1">{{ app.member.public_pref_first_name}}<br/>{{ app.member.public_last_name}}</h4>
         </div>
       </a>
     </div>

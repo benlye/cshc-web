@@ -34,6 +34,7 @@ export const MEMBER_LIST_QUERY = gql`
       results(pageSize: 5000) {
         firstName
         lastName
+        isAnonymized
         id
         gender
         shirtNumber

@@ -4,6 +4,7 @@ const MemberPropType = PropTypes.shape({
   id: PropTypes.number.isRequired,
   firstName: PropTypes.string.isRequired,
   lastName: PropTypes.string.isRequired,
+  isAnonymized: PropTypes.bool,
   profilePicUrl: PropTypes.string,
   prefPosition: PropTypes.string,
   isUmpire: PropTypes.bool,
