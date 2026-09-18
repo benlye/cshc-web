@@ -10,7 +10,7 @@ Expected context:
 {% load thumbnail from sorl_thumbnail %}
 
 <div class="{{ class }} g-pos-rel">
-  {% if member.profile_pic %}
+  {% if show_profile_pic %}
     {% thumbnail member.profile_pic size crop="center" as im %}
       <img class="u-shadow-v29 w-100 rounded-circle" src="{{ im.url }}">
     {% empty %}

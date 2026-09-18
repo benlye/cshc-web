@@ -21,6 +21,7 @@ MemberLink.propTypes = {
   member: PropTypes.shape({
     firstName: PropTypes.string,
     lastName: PropTypes.string,
+    isAnonymized: PropTypes.bool,
   }).isRequired,
   badgeCount: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   useFullName: PropTypes.bool,

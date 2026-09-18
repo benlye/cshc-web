@@ -72,6 +72,7 @@ export const MATCH_DATA_QUERY = gql`
               id
               firstName
               lastName
+              isAnonymized
               gender
               shirtNumber
             }
@@ -88,6 +89,7 @@ export const MATCH_DATA_QUERY = gql`
               id
               firstName
               lastName
+              isAnonymized
               gender
               shirtNumber
             }

@@ -75,7 +75,7 @@ class RssMatchReportsFeed(Feed):
             None if no author specified.
         """
         if item.report_author:
-            return item.report_author.full_name()
+            return item.report_author.public_full_name()
         return None
 
     def item_description(self, item):

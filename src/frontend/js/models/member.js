@@ -25,10 +25,12 @@ const Member = {
   },
 
   firstNameAndInitial(member) {
+    if (member.isAnonymized) return 'Anonymous';
     return `${member.firstName} ${member.lastName[0].toUpperCase()}`;
   },
 
   fullName(member) {
+    if (member.isAnonymized) return 'Anonymous Player';
     return `${member.firstName} ${member.lastName}`.trim();
   },
 

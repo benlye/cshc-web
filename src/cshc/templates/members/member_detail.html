@@ -4,7 +4,7 @@
 {% load cshc_tags %}
 {% load compress %}
 
-{% block title %}{{ block.super }} | {{ member.full_name }}{% endblock %}
+{% block title %}{{ block.super }} | {{ member.public_full_name }}{% endblock %}
 
 {% block link %}
   {% compress css %}
@@ -17,7 +17,7 @@
 {% block breadcrumbs %}
   {{ block.super }}
   {% breadcrumb "Members" "member_list" %}
-  {% breadcrumb member.full_name "member_detail" pk=member.id %}
+  {% breadcrumb member.public_full_name "member_detail" pk=member.id %}
 {% endblock %}
 
 {% block content %}

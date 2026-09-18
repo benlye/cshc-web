@@ -29,6 +29,7 @@ export const SQUAD_ROSTER_QUERY = gql`
           id
           firstName
           lastName
+          isAnonymized
           prefPosition
           shirtNumber
           gender

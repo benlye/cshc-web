@@ -18,6 +18,16 @@ from .stats import SquadPlayingStats, AllSeasonsPlayingStats
 from .models import CommitteePosition, Member, CommitteeMembership, SquadMembership
 
 
+def viewer_is_staff(info):
+    """ Returns True if the GraphQL request is made by a member of staff.
+
+        Staff see members' real names; everyone else sees anonymized names
+        for members who have opted to be anonymous.
+    """
+    user = getattr(info.context, 'user', None)
+    return bool(user and user.is_authenticated and user.is_staff)
+
+
 class NumberInFilter(django_filters.BaseInFilter, django_filters.CharFilter):
     pass
 
@@ -28,14 +38,17 @@ class MemberFilter(AndFilter):
     name = django_filters.CharFilter(name='first_name', method="filter_name")
 
     def filter_name(self, queryset, name, value):
-        # filter by first name or last name
+        # filter by first name or last name, but never match anonymized members
+        # by their real name (they can't be searched for by name publicly)
         return queryset.filter(
             Q(first_name__icontains=value) | Q(last_name__icontains=value)
-        )
+        ).exclude(anonymous=True)
 
     class Meta:
         model = Member
-        fields = ['is_current', 'gender', 'pref_position', 'first_name', 'known_as', 'last_name',
+        # Note: raw first_name/known_as/last_name lookups are deliberately NOT
+        # exposed - anonymized members must not be searchable by their real name.
+        fields = ['is_current', 'gender', 'pref_position',
                   'appearances__match__season__slug', 'appearances__match__our_team__slug',
                   'teamcaptaincy__season__slug', 'squadmembership__season__slug', 'squadmembership__team__slug',
                   'is_umpire', 'is_coach']
@@ -91,13 +104,13 @@ class MemberType(DjangoObjectType):
     num_appearances = graphene.Int()
     goals = graphene.Int()
     full_name = graphene.String()
+    is_anonymized = graphene.Boolean()
 
     class Meta:
         model = Member
+        # Note: raw first_name/known_as/last_name lookups are deliberately NOT
+        # exposed - anonymized members must not be searchable by their real name.
         filter_fields = {
-            'first_name': ['exact', 'icontains', 'istartswith'],
-            'known_as': ['exact', 'icontains', 'istartswith'],
-            'last_name': ['exact', 'icontains', 'istartswith'],
             'is_current': ['exact'],
             'pref_position': ['in'],
             'gender': ['exact'],
@@ -113,7 +126,20 @@ class MemberType(DjangoObjectType):
         return self.full_address()
 
     def resolve_first_name(self, info):
-        return self.pref_first_name()
+        if viewer_is_staff(info):
+            return self.pref_first_name()
+        return self.public_pref_first_name()
+
+    def resolve_last_name(self, info):
+        if viewer_is_staff(info):
+            return self.last_name
+        return self.public_last_name()
+
+    def resolve_known_as(self, info):
+        # Never expose an anonymized member's real 'known as' name to the public
+        if self.anonymous and not viewer_is_staff(info):
+            return None
+        return self.known_as
 
     def resolve_num_appearances(self, info):
         return self.num_appearances
@@ -122,13 +148,22 @@ class MemberType(DjangoObjectType):
         return self.goals
 
     def resolve_thumb_url(self, info, size='50x50', crop=None):
+        # Don't expose an anonymized member's photo to the public - it would reveal who they are
+        if self.anonymous and not viewer_is_staff(info):
+            return ''
         return get_thumbnail_url(self.profile_pic, size, crop, self.profile_pic_cropping)
 
     def resolve_pref_position(self, info):
         return self.get_pref_position_display()
 
     def resolve_full_name(self, info):
-        return self.full_name()
+        if viewer_is_staff(info):
+            return self.full_name()
+        return self.public_full_name()
+
+    def resolve_is_anonymized(self, info):
+        # True when this member should appear anonymized to the current viewer
+        return self.anonymous and not viewer_is_staff(info)
 
 
 class MemberList(DjangoListObjectType):
@@ -230,13 +265,14 @@ def post_optimize_members(queryset, **kwargs):
             int(x) for x in kwargs['pref_position__in'].split(",")]
         queryset = queryset.filter(pref_position__in=pref_positions)
 
-    # Manually create text search by first name OR last name
+    # Manually create text search by first name OR last name. Anonymized members
+    # are never matched by their real name - they can't be searched for publicly.
     text_query = None
     if 'name' in kwargs:
         text_search = kwargs.pop('name')
         text_query = Q(first_name__istartswith=text_search) | Q(
             last_name__istartswith=text_search) | Q(known_as__istartswith=text_search)
-        queryset = queryset.filter(text_query)
+        queryset = queryset.filter(text_query).exclude(anonymous=True)
 
     queryset = queryset.annotate(num_appearances=Count(
         'appearances'), goals=Sum('appearances__goals'))

@@ -30,7 +30,7 @@ def js_members():
     Return a list of all members, with id and name properties,
     suitable for passing to JavaScript.
     """
-    return [{'id': x.id, 'name': x.full_name()} for x in Member.objects.only('id', 'first_name', 'known_as', 'last_name')]
+    return [{'id': x.id, 'name': x.public_full_name()} for x in Member.objects.only('id', 'first_name', 'known_as', 'last_name', 'anonymous')]
 
 
 class MemberListView(TemplateView):
@@ -170,14 +170,19 @@ class MemberDetailView(DetailView):
                  self.request.user.has_member() and
                  self.request.user.member.id == member.id)
 
+        # Anonymized members are shown as "Anonymous Player" (with no photo) to the public.
+        # Staff, and the member themselves, still see the real name and photo.
+        show_real = member.anonymous is False or self.request.user.is_staff or is_me
+
         context['props'] = dict(
             isMe=is_me,
             member=dict(
                 id=member.id,
-                firstName=member.pref_first_name(),
-                lastName=member.last_name,
+                firstName=member.pref_first_name() if show_real else member.public_pref_first_name(),
+                lastName=member.last_name if show_real else member.public_last_name(),
+                isAnonymized=not show_real,
                 profilePicUrl=get_thumbnail_url(
-                    member.profile_pic, '255x255', 'center', member.profile_pic_cropping),
+                    member.profile_pic, '255x255', 'center', member.profile_pic_cropping) if show_real else '',
                 prefPosition=member.get_pref_position_display(),
                 squad=squad,
                 isUmpire=member.is_umpire,

@@ -94,7 +94,7 @@
           <td class="scorers text-right">
             <div class="g-color-white-opacity-0_8 g-font-size-14 g-font-size-16--md g-font-size-18--lg">
               {% for scorer in scorers %}
-                <div><a href="{{scorer.member.get_absolute_url}}" title="View profile">{{ scorer.member.full_name }}</a>{% if scorer.goals > 1 %}&nbsp;({{ scorer.goals }}){% endif %}</div>
+                <div><a href="{{scorer.member.get_absolute_url}}" title="View profile">{{ scorer.member.public_full_name }}</a>{% if scorer.goals > 1 %}&nbsp;({{ scorer.goals }}){% endif %}</div>
               {% endfor %}
             </div>
           </td>
@@ -108,19 +108,19 @@
         {% for carded in green_cards %}
           <div class="carded-player">
             <img class="g-mr-5" src="{% static 'img/green_card.png' %}" title="Green card" />
-            <a href="{{carded.get_absolute_url}}" title="View profile">{{ carded.full_name }}</a>
+            <a href="{{carded.get_absolute_url}}" title="View profile">{{ carded.public_full_name }}</a>
           </div>
         {% endfor %}
         {% for carded in yellow_cards %}
           <div class="carded-player">
             <img class="g-mr-5" src="{% static 'img/yellow_card.png' %}" title="Yellow card" />
-            <a href="{{carded.get_absolute_url}}" title="View profile">{{ carded.full_name }}</a>
+            <a href="{{carded.get_absolute_url}}" title="View profile">{{ carded.public_full_name }}</a>
           </div>
         {% endfor %}
         {% for carded in red_cards %}
           <div class="carded-player">
             <img class="g-mr-5" src="{% static 'img/red_card.png' %}" title="Red card" />
-            <a href="{{carded.get_absolute_url}}" title="View profile">{{ carded.full_name }}</a>
+            <a href="{{carded.get_absolute_url}}" title="View profile">{{ carded.public_full_name }}</a>
           </div>
         {% endfor %}
       </div>

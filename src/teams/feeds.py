@@ -92,7 +92,7 @@ class RssClubTeamMatchReportsFeed(Feed):
     def item_author_name(self, item):
         """ Returns the name of the author (of the match report), or None if no author specified"""
         if item.report_author is not None:
-            return item.report_author.full_name()
+            return item.report_author.public_full_name()
         return None
 
     def item_description(self, item):

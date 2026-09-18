@@ -11,7 +11,7 @@ Expects context:
   <div class="award-content">
     <h5>
       {% if award_winner.member %}
-        <a title="View profile" href="{{ award_winner.member.get_absolute_url }}">{{ award_winner.member.full_name }}</a>
+        <a title="View profile" href="{{ award_winner.member.get_absolute_url }}">{{ award_winner.member.public_full_name }}</a>
       {% else %}
         {{ award_winner.awardee }}
       {% endif %}
