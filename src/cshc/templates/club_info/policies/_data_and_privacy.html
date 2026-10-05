@@ -1,0 +1,96 @@
+{% load cshc_tags %}
+{% clubinfo 'SecretaryName' as secretary_name %}
+{% include 'blocks/_divider.html' %}
+<section id="data" class="container g-mt-20 g-mt-40--md g-mb-40 g-font-size-16 g-font-size-18--md">
+  {% include 'blocks/_middle_heading.html' with title="Data and Privacy" %}
+  <p>The Club collects and uses personal information in order to administer the Club, organise hockey and other activities,
+    communicate with members, and maintain records of participation and playing history.</p>
+  <p>We will only collect and use information that we reasonably need, will take appropriate steps to keep it secure, and
+    will not sell members' personal information or use it for unrelated purposes.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Information We Hold" %}
+
+  <p>The information we hold may include:</p>
+  <ul>
+    <li>name and contact details</li>
+    <li>date of birth and other information required for player registration and eligibility</li>
+    <li>emergency contact details</li>
+    <li>membership, team and availability information</li>
+    <li>medical information relevant to participation in hockey</li>
+    <li>records relating to matches, training and other Club activities</li>
+    <li>playing records and statistics</li>
+    <li>other information provided by members where it is reasonably required for the operation of the Club</li>
+  </ul>
+  <p>Access to non-public personal information is restricted according to role and to those who require the information
+    for a legitimate Club purpose.</p>
+    
+  {% include 'blocks/_middle_subheading.html' with title="How We Use Your Information" %}
+  <p>Personal information may be used to:</p>
+  <ul>
+    <li>administer membership and subscriptions</li>
+    <li>organise teams, training, matches and other Club activities</li>
+    <li>communicate with members</li>
+    <li>manage player availability and selection</li>
+    <li>support player safety, safeguarding and welfare</li>
+    <li>administer competitions and comply with England Hockey and league requirements</li>
+    <li>maintain the Club's playing records, statistics and history</li>
+  </ul>
+  <p>We process personal information where it is necessary to administer membership and Club activities, to meet our legal
+    or regulatory obligations, where we have a legitimate interest in doing so, or where consent has been provided.</p>
+  <p>Where we rely on consent, that consent may be withdrawn at any time.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Medical Information" %}
+  <p>The Club may ask members to provide details of medical conditions which are relevant to their safe participation in
+    hockey, such as asthma, allergies or other conditions which coaches or team officials may need to be aware of.</p>
+  <p>Providing this information is optional. Where a member chooses to provide medical information, the Club will ask 
+    for their explicit consent, or appropriate consent from a parent or carer where applicable, to hold and use that
+    information for the purposes of player safety and welfare.</p>
+  <p>Medical information is treated as confidential and access is restricted to Club officers, coaches, captains or other
+    authorised volunteers where they have an appropriate reason to know it. It will not be published or used for unrelated
+    purposes.</p>
+  <p>Where necessary for a player's safety or welfare, relevant information may be shared with medical professionals, 
+    emergency services or others providing assistance.</p>
+  <p>Members should ensure that medical information provided to the Club remains accurate and up to date.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Club Website and Playing Records" %}
+  <p>The Club maintains its own website and database containing membership and playing information.</p>
+  <p>Personal contact details, medical information and other private membership information are not made publicly available.</p>
+  <p>Playing information such as team selections, appearances, results, goals, cards, awards and other hockey statistics
+    may be published on the Club website and retained as part of the Club's historical playing records.</p>
+  <p>Historical playing records may continue to be retained and published after a player ceases to be a member of the Club.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Spond" %}
+  <p>The Club uses Spond to help organise teams, training, matches, events and communications.</p>
+  <p>Information required for these purposes may be stored and processed using Spond. Members using Spond are also subject
+    to Spond's own privacy policy and terms of service.</p>
+  <p>Access to Club groups within Spond is restricted to members and others who have an appropriate reason to participate.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="England Hockey GMS" %}
+  <p>Players participating in competitions administered through England Hockey's Game Management System (GMS) are required
+    to register with GMS</p>
+  <p>GMS is operated by England Hockey and maintains player profiles, registrations, match records and playing history.
+    The Club's authorised administrators and team officials may access and update information in GMS where required to
+    administer teams and competitions.</p>
+  <p>Information held directly by England Hockey is subject to England Hockey's own privacy policy and terms of use.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Keeping Information Secure" %}
+  <p>We take reasonable technical and organisational measures to protect personal information from unauthorised access,
+    loss or misuse.</p>
+  <p>Access to Club systems and personal information is limited according to role. Club officers, captains, coaches and
+    volunteers with access to members' information must use it only for legitimate Club purposes and take appropriate
+    care to keep it secure.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="How Long We Keep Information" %}
+  <p>We keep personal information only for as long as it is reasonably required for the purpose for which it was collected,
+    or where we have a legal, regulatory or safeguarding reason to retain it.</p>
+  <p>Membership and administrative information which is no longer required will be deleted or anonymised when appropriate.</p>
+  <p>Playing records, match results and statistics may be retained indefinitely as part of the historical record of the Club.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Your Information and Your Rights" %}
+  <p>Members should keep their information up to date and can ask the Club to correct information which is inaccurate.</p>
+  <p>You may ask us for a copy of the personal information we hold about you and, where applicable, ask us to correct,
+    delete or restrict the use of your information, object to its processing, or withdraw consent previously provided.</p>
+  <p>Some information may need to be retained where there is a continuing legal, safeguarding, competition or legitimate
+    Club reason for doing so.</p>
+  <p>Questions or requests relating to personal information should be directed to the {% clubinfo_email 'SecretaryEmail' secretary_name %}.</p>
+</section>

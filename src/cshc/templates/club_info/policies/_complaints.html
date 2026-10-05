@@ -1,0 +1,110 @@
+{% load cshc_tags %}
+{% clubinfo 'SecretaryName' as secretary_name %}
+{% include 'blocks/_divider.html' %}
+<section id="complaints" class="container g-mt-20 g-mt-40--md g-mb-40 g-font-size-16 g-font-size-18--md">
+  {% include 'blocks/_middle_heading.html' with title="Complaints and Concerns" %}
+  <p>Cambridge South Hockey Club aims to provide a positive experience for everyone involved in the Club. We recognise,
+    however, that concerns or complaints may sometimes arise.</p>
+  <p>We encourage members to raise concerns so that they can be addressed fairly, promptly and at an appropriate level.</p>
+  
+  {% include 'blocks/_middle_subheading.html' with title="Raising a Concern" %}
+  <p>Where appropriate, concerns should initially be raised informally with the person best placed to resolve them, such
+    as a captain, coach or Club officer.</p>
+  <p>Many issues can be resolved quickly through a conversation and we encourage members to use this approach where they
+    feel comfortable doing so.</p>
+  <p>There is no requirement to attempt informal resolution where the matter is serious, involves safeguarding or welfare,
+    or where the person raising the concern does not consider an informal approach appropriate.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Formal Complaints" %}
+  <p>Where a concern cannot be resolved informally, or where the nature of the matter makes an informal approach
+    inappropriate, a formal complaint may be made to the {% clubinfo_email 'SecretaryEmail' secretary_name %}.</p>
+  <p>A formal complaint should normally be made in writing and should explain:</p>
+  <ul>
+    <li>what has happened</li>
+    <li>when and, where relevant, where it happened</li>
+    <li>who was involved</li>
+    <li>any steps already taken to resolve the matter</li>
+    <li>any relevant supporting information</li>
+    <li>what outcome or resolution the complainant is seeking</li>
+  </ul>
+  <p>Complaints should be raised as soon as reasonably practicable so that the circumstances can be properly considered.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="How We Will Deal with a Complaint" %}
+  <p>The Club will acknowledge a formal complaint and identify an appropriate person or group to consider it.</p>
+  <p>The Club will:</p>
+  <ul>
+    <li>consider the complaint fairly and impartially</li>
+    <li>ensure that anyone handling the complaint does not have a material conflict of interest</li>
+    <li>give anyone whose conduct is the subject of a complaint a reasonable opportunity to understand and respond to the
+      concerns raised</li>
+    <li>seek further information where necessary</li>
+    <li>handle information sensitively and share it only where reasonably necessary to consider the matter</li>
+    <li>communicate the outcome to the complainant when the process is complete</li>
+  </ul>
+
+  <p>The procedure followed will be proportionate to the nature and seriousness of the complaint. Some matters may be
+    resolved through discussion or mediation, while others may require a more formal investigation or consideration by
+    members of the Club Committee.</p>
+  <p>Where a complaint identifies an opportunity to improve Club policies or practices, the Club will consider appropriate
+    changes.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Conflicts of Interest" %}
+  <p>A person who is directly involved in a complaint, or who has another material conflict of interest, should not be
+    responsible for deciding its outcome.</p>
+  <p>If a complaint concerns the Club Secretary, it should be raised with the Chair. If it concerns the Chair, it should
+    be raised with another appropriate member of the Club Committee.</p>
+  <p>The Club may appoint other suitably independent people to consider a complaint where this is necessary to ensure that
+    it is handled fairly.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Outcome and Review" %}
+  <p>The complainant will be informed of the outcome of a formal complaint and, where appropriate, any action the Club
+    proposes to take.</p>
+  <p>Where the complainant believes that the complaint has not been handled fairly or that significant relevant information
+    has not been considered, they may ask for the outcome to be reviewed.</p>
+  <p>A review should, wherever practicable, be undertaken by someone who was not responsible for the original decision.</p>
+  <p>A review is not normally a complete rehearing of the complaint, but will consider whether the complaint was handled
+    fairly, whether relevant information was properly considered, and whether the outcome was reasonable in the circumstances.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Safeguarding Concerns" %}
+  <p>A concern involving the welfare or safeguarding of a child or young person should be reported promptly to the
+    Club Welfare Officer and will be handled in accordance with the Club's Safeguarding Policy and England Hockey's
+    safeguarding procedures.</p>
+  <p>Safeguarding concerns should not be investigated informally by members of the Club before being referred through
+    the appropriate safeguarding process.</p>
+
+{% include 'blocks/_middle_subheading.html' with title="Behaviour and Disciplinary Matters" %}
+  <p>Concerns about behaviour may also fall within the Club's Behaviour Policy and Code of Conduct or England Hockey's 
+    <a href="https://www.englandhockey.co.uk/governance/rules-and-regulations/discipline-and-misconduct/spirit-of-hockey/england-hockey-s-spirit-of-hockey-code-of-conduct" target="_blank" rel="noopener noreferrer">
+      Spirit of Hockey – Code of Conduct</a> and 
+    <a href="https://www.englandhockey.co.uk/governance/rules-and-regulations/regulations-and-policies" target="_blank" rel="noopener noreferrer">
+      Disciplinary Regulations</a>.</p>
+  <p>Where appropriate, the Club may deal with a matter under its disciplinary procedures or refer it to England Hockey
+    or the relevant hockey authority.</p>
+  <p>England Hockey imposes time limits on some disciplinary and misconduct complaints. Anyone considering making a
+    complaint directly to England Hockey should therefore consult the current England Hockey procedures promptly.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Serious Concerns and Whistleblowing" %}
+  <p>Members are encouraged to raise genuine concerns about serious wrongdoing, unsafe practices, safeguarding failures
+    or conduct which may place individuals or the Club at risk.</p>
+  <p>Where the concern involves those who would normally receive a complaint, it may be raised directly with another
+    appropriate Club officer or the Chair.</p>
+  <p>Where it would not be appropriate to raise the matter within the Club, concerns may be raised directly with England
+    Hockey or another appropriate authority.</p>
+  <p>No member should be disadvantaged for raising a genuine concern in good faith or for supporting someone else who does
+    so.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Confidentiality" %}
+  <p>Complaints and concerns will be handled as sensitively and confidentially as reasonably possible.</p>
+  <p>Absolute confidentiality cannot always be guaranteed. Information may need to be shared with the person complained
+    about, witnesses, Club officers, England Hockey or another appropriate authority in order to investigate or respond
+    to a concern fairly.</p>
+  <p>Where possible, the Club will explain when information needs to be shared and why.</p>
+
+  {% include 'blocks/_middle_subheading.html' with title="Appropriate Use of the Complaints Process" %}
+  <p>Everyone involved in a complaint is expected to communicate respectfully and cooperate reasonably with the process.</p>
+  <p>The Club may decline to reconsider a matter which has already been properly considered unless significant new
+    information is provided.</p>
+  <p>The Club may also take appropriate action where a complaint is knowingly false, malicious or forms part of a pattern
+    of abusive or unreasonable behaviour. Making a complaint which is not upheld does not, by itself, mean that the
+    complaint was made maliciously.</p>
+</section>
