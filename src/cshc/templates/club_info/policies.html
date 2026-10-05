@@ -1,0 +1,100 @@
+{% extends "base.html" %}
+{% load static %}
+{% load django_bootstrap_breadcrumbs %}
+{% load thumbnail from sorl_thumbnail %}
+{% load cshc_tags %}
+{% load unify %}
+{% load compress %}
+
+{% block title %}{{ block.super }} | Policies{% endblock %}
+
+{% block breadcrumbs %}
+  {{ block.super }}
+  {% clear_breadcrumbs %}
+{% endblock %}
+
+{% block main %}
+
+{% include "blocks/_background_hero.html" with image="img/ladies-1.jpg" title="Club Policies" subtitle="Staying safe, fair, and fun" %}
+
+{% clubinfo 'SecretaryName' as secretary_name %}
+
+<section class="container g-mt-20 g-mt-40--md g-mb-40 g-font-size-16 g-font-size-18--md">
+  <p>Our policies set out how Cambridge South Hockey Club operates and the standards we expect from everyone involved in
+    the Club. They are designed to help us provide a safe, fair, welcoming and enjoyable environment for players, coaches,
+    officials, volunteers, parents and supporters.</p>
+  <p>The policies apply to both adults and young people unless stated otherwise, with additional safeguards in place for
+    members under 18 where appropriate.</p>
+  <p>If you have any questions about our policies, please contact the {% clubinfo_email 'SecretaryEmail' secretary_name %}.</p>
+  <p>Parents and young players can also find further information about junior hockey, safeguarding and welfare on our
+    <a href="{% url 'juniors_index' %}">Juniors</a> page.</p>
+</section>
+
+<section class="container g-mt-20 g-mt-40--md g-mb-40 g-font-size-16 g-font-size-18--md">
+  <div class="row">
+    <div class="col-12 col-md-6 g-mb-30">
+      <div class="u-shadow-v1-5 g-bg-white g-pa-30 g-pa-40--md h-100">
+        <h3 class="g-font-weight-300 g-mb-20">Our Club</h3>
+        <ul class="list-unstyled g-font-size-16 g-mb-0">
+          <li class="g-mb-10"><a href="#behaviour">Behaviour</a></li>
+          <li class="g-mb-10"><a href="#equality">Equality, Diversity &amp; Inclusion</a></li>
+          <li class="g-mb-10"><a href="#safeguarding">Safeguarding</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 g-mb-30">
+      <div class="u-shadow-v1-5 g-bg-white g-pa-30 g-pa-40--md h-100">
+        <h3 class="g-font-weight-300 g-mb-20">Playing Hockey</h3>
+        <ul class="list-unstyled g-font-size-16 g-mb-0">
+          <li class="g-mb-10"><a href="#safehockey">Safe Hockey</a></li>
+          <li class="g-mb-10"><a href="#medical">Medical &amp; Emergency Treatment</a></li>
+          <li class="g-mb-10"><a href="#selection">Selection</a></li>
+          <li class="g-mb-10"><a href="#training">Training</a></li>
+          <li class="g-mb-10"><a href="#travel">Travel</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 g-mb-30">
+      <div class="u-shadow-v1-5 g-bg-white g-pa-30 g-pa-40--md h-100">
+        <h3 class="g-font-weight-300 g-mb-20">Information &amp; Communication</h3>
+        <ul class="list-unstyled g-font-size-16 g-mb-0">
+          <li class="g-mb-10"><a href="#communications">Communications</a></li>
+          <li class="g-mb-10"><a href="#photography">Photography &amp; Videography</a></li>
+          <li class="g-mb-10"><a href="#data">Data &amp; Privacy</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="col-12 col-md-6 g-mb-30">
+      <div class="u-shadow-v1-5 g-bg-white g-pa-30 g-pa-40--md h-100">
+        <h3 class="g-font-weight-300 g-mb-20">Raising a Concern</h3>
+        <ul class="list-unstyled g-font-size-16 g-mb-0">
+          <li class="g-mb-10"><a href="#complaints">Complaints &amp; Concerns</a></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+{% include 'club_info/policies/_behaviour.html' %}
+{% include 'club_info/policies/_equality.html' %}
+{% include 'club_info/policies/_safeguarding.html' %}
+
+{% include 'club_info/policies/_safe_hockey.html' %}
+{% include 'club_info/policies/_medical.html' %}
+{% include 'club_info/policies/_selection.html' %}
+{% include 'club_info/policies/_training.html' %}
+{% include 'club_info/policies/_travel.html' %}
+
+{% include 'club_info/policies/_communications.html' %}
+{% include 'club_info/policies/_photography.html' %}
+{% include 'club_info/policies/_data_and_privacy.html' %}
+
+{% include 'club_info/policies/_complaints.html' %}
+{% include 'blocks/_divider.html' %}
+
+{% endblock main %}
+
+{% block body_js %}
+  {{ block.super }}
+  {% include 'blocks/_focus_state_js.html' %}
+{% endblock %}
