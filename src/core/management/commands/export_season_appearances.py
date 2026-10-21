@@ -94,7 +94,7 @@ class Command(BaseCommand):
             output_file = sys.stdout
             close_file = False
         else:
-            output_file = open(output_path, 'w', newline='', encoding='utf-8')
+            output_file = open(output_path, 'w', newline='', encoding='utf-8-sig')
             close_file = True
 
         try:
