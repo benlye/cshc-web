@@ -170,7 +170,9 @@ class MemberType(DjangoObjectType):
         return self.full_name()
 
     def resolve_shirt_number(self, info):
-        assignment = self.current_shirt_number()
+        # Prefer the active assignment; fall back to the most recent historic
+        # one so former players' last-known shirts still appear in listings.
+        assignment = self.current_shirt_number() or self.last_shirt_number()
         return str(assignment.shirt.number) if assignment else ''
 
 
@@ -273,12 +275,21 @@ def post_optimize_members(queryset, **kwargs):
             int(x) for x in kwargs['pref_position__in'].split(",")]
         queryset = queryset.filter(pref_position__in=pref_positions)
 
-    # Manually create text search by first name OR last name
+    # Manually create text search by first name, last name, known_as, OR shirt
+    # number (if the search term is purely numeric, match members with any
+    # assignment on that shirt — current, in grace, or historic).
     text_query = None
     if 'name' in kwargs:
         text_search = kwargs.pop('name')
         text_query = Q(first_name__istartswith=text_search) | Q(
             last_name__istartswith=text_search) | Q(known_as__istartswith=text_search)
+        stripped = text_search.strip() if text_search else ''
+        if stripped.isdigit():
+            # Subquery form so the join doesn't inflate Count/Sum annotations below.
+            shirt_member_ids = ShirtNumberAssignment.objects.filter(
+                shirt__number=int(stripped)
+            ).values_list('member_id', flat=True)
+            text_query = text_query | Q(pk__in=shirt_member_ids)
         queryset = queryset.filter(text_query)
 
     queryset = queryset.annotate(num_appearances=Count(

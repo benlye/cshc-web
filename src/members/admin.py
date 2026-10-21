@@ -103,7 +103,8 @@ class MemberAdmin(ImageCroppingMixin, admin.ModelAdmin):
     """ Admin interface definition for the Member model."""
     model = Member
     inlines = (SquadMembershipInline, MemberShirtAssignmentInline)
-    search_fields = ('first_name', 'known_as', 'last_name')
+    search_fields = ('first_name', 'known_as', 'last_name',
+                     '=shirt_assignments__shirt__number')
     list_filter = ('is_current', 'gender', 'pref_position',
                    'is_umpire', 'is_coach')
     list_display = ('full_name_with_option', 'user', 'gender', 'pref_position',

@@ -267,6 +267,18 @@ class Member(models.Model):
             .first()
         )
 
+    def last_shirt_number(self):
+        """ Returns the member's most recent ShirtNumberAssignment (active or
+            historic), or None if they've never had one. Useful for showing
+            former players' last-known shirt in public listings.
+        """
+        return (
+            self.shirt_assignments
+            .select_related('shirt')
+            .order_by('-start_date')
+            .first()
+        )
+
     def current_squad(self):
         """ Returns the member's current squad membership (if they are currently in a squad; otherwise None) """
         try:
