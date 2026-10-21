@@ -100,7 +100,13 @@ class Member(models.Model):
     """ Indicates whether this member is a current member of the club. Useful for filtering etc. """
 
     shirt_number = models.CharField(max_length=4, blank=True)
-    """ Players shirt number """
+    """ Deprecated. Historic shirt number captured before the ShirtNumber /
+        ShirtNumberAssignment models existed. Not read anywhere in code; kept
+        on the model so Django still writes an empty string on INSERT (the DB
+        column is NOT NULL with no server-side default). Use
+        `member.current_shirt_number()` for the live value. The field will be
+        removed in a later migration once we're happy with the new system in
+        production. """
 
     is_coach = models.NullBooleanField(
         "Coach?", null=True, blank=True, default=False, help_text='Does this member possess a hockey coaching qualification?')
@@ -246,6 +252,20 @@ class Member(models.Model):
         if not addr.strip():
             return 'Address unknown'
         return addr
+
+    def current_shirt_number(self):
+        """ Returns the member's active ShirtNumberAssignment (open or in grace
+            period), or None if they have no shirt.
+        """
+        from django.utils import timezone
+        today = timezone.now().date()
+        return (
+            self.shirt_assignments
+            .filter(models.Q(end_date__isnull=True) | models.Q(end_date__gte=today))
+            .select_related('shirt')
+            .order_by('-start_date')
+            .first()
+        )
 
     def current_squad(self):
         """ Returns the member's current squad membership (if they are currently in a squad; otherwise None) """

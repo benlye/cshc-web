@@ -19,6 +19,7 @@ from teams.models import ClubTeamSeasonParticipation
 from teams.stats import update_southerners_stats_for_season, update_participation_stats_for_season
 from opposition.stats import update_all_club_stats
 from training.models import TrainingSession
+from members.models import ShirtNumber
 
 
 class Command(BaseCommand):
@@ -70,6 +71,17 @@ class Command(BaseCommand):
             print("Purged all training sessions from before yesterday")
         except Exception as e:
             errors.append("Failed to purge training sessions: {}".format(e))
+
+        try:
+            corrections = 0
+            for shirt in ShirtNumber.objects.all():
+                old, new = shirt.recompute_status(save=True)
+                if old != new:
+                    corrections += 1
+                    print("Shirt {} status corrected: {} -> {}".format(shirt, old, new))
+            print("Reconciled shirt pool: {} status corrections".format(corrections))
+        except Exception as e:
+            errors.append("Failed to reconcile shirt pool: {}".format(e))
 
         # Scrape league tables
         try:

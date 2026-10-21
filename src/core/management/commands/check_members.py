@@ -15,11 +15,13 @@ from collections import OrderedDict
 from django.conf import settings
 from django.core.mail import mail_admins, send_mail
 from django.core.management.base import BaseCommand, CommandError
+from django.db.models import Count, Q
 from django.utils import timezone
 
 from competitions.models import Season
 from matches.models import Appearance
-from members.models import Member
+from members.models import Member, ShirtNumberAssignment
+from members.models.shirt_number import get_max_shirt_number
 
 
 class Command(BaseCommand):
@@ -68,7 +70,9 @@ class Command(BaseCommand):
             raise CommandError('--email-to cannot be used with --no-email')
 
         current_members = Member.objects.filter(is_current=True)
-        duplicate_numbers = self.get_duplicate_shirt_numbers(current_members)
+        duplicate_numbers = self.get_duplicate_shirt_numbers()
+        multi_shirt_members = self.get_members_with_multiple_shirts()
+        over_max_shirts = self.get_shirts_above_max()
         activity_seasons = self.get_activity_seasons(inactive_seasons)
         inactive_members = self.get_inactive_members(
             current_members,
@@ -79,17 +83,21 @@ class Command(BaseCommand):
         self.write_console_summary(
             current_members.count(),
             duplicate_numbers,
+            multi_shirt_members,
+            over_max_shirts,
             inactive_members,
             activity_seasons,
             include_never_played=include_never_played,
         )
 
-        if duplicate_numbers or inactive_members:
+        if duplicate_numbers or multi_shirt_members or over_max_shirts or inactive_members:
             report = self.build_report(
                 current_members.count(),
                 inactive_seasons,
                 activity_seasons,
                 duplicate_numbers,
+                multi_shirt_members,
+                over_max_shirts,
                 inactive_members,
                 include_never_played=include_never_played,
             )
@@ -110,28 +118,57 @@ class Command(BaseCommand):
         else:
             self.stdout.write('No validation issues found. No email sent.')
 
-    def get_duplicate_shirt_numbers(self, current_members):
-        shirt_groups = OrderedDict()
-        for member in current_members:
-            shirt_number = (member.shirt_number or '').strip()
-            if not shirt_number:
-                continue
-            group_key = (member.gender, shirt_number)
-            shirt_groups.setdefault(group_key, []).append(member)
+    def get_duplicate_shirt_numbers(self):
+        """ Integrity probe: shirts with more than one active assignment.
 
-        return OrderedDict(
-            (group_key, members)
-            for group_key, members in sorted(shirt_groups.items(), key=self.shirt_group_sort_key)
-            if len(members) > 1
+            Should normally return nothing — a hit means the save/clean
+            enforcement in ShirtNumberAssignment was bypassed.
+        """
+        today = timezone.now().date()
+        active = ShirtNumberAssignment.objects.filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=today))
+        offenders = (
+            active.values('shirt').annotate(c=Count('id')).filter(c__gt=1)
+            .values_list('shirt', flat=True)
         )
+        groups = OrderedDict()
+        for assignment in active.filter(shirt__in=list(offenders)).select_related('shirt', 'member'):
+            key = (assignment.shirt.gender, assignment.shirt.number)
+            groups.setdefault(key, []).append(assignment.member)
+        return OrderedDict(sorted(groups.items()))
 
-    def shirt_group_sort_key(self, item):
-        gender, shirt_number = item[0]
-        try:
-            numeric_value = int(shirt_number)
-            return (gender, 0, numeric_value, shirt_number)
-        except ValueError:
-            return (gender, 1, shirt_number)
+    def get_members_with_multiple_shirts(self):
+        """ Integrity probe: members with more than one active assignment.
+
+            Should normally return nothing — a hit means the save/clean
+            enforcement in ShirtNumberAssignment was bypassed.
+        """
+        today = timezone.now().date()
+        active = ShirtNumberAssignment.objects.filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=today))
+        offenders = (
+            active.values('member').annotate(c=Count('id')).filter(c__gt=1)
+            .values_list('member', flat=True)
+        )
+        groups = OrderedDict()
+        for assignment in active.filter(member__in=list(offenders)).select_related('shirt', 'member'):
+            groups.setdefault(assignment.member, []).append(assignment.shirt)
+        return groups
+
+    def get_shirts_above_max(self):
+        """ Active shirts whose number exceeds the current ClubInfo max for their gender. """
+        today = timezone.now().date()
+        active = ShirtNumberAssignment.objects.filter(
+            Q(end_date__isnull=True) | Q(end_date__gte=today),
+        ).select_related('shirt', 'member')
+
+        offenders = []
+        for assignment in active:
+            max_n = get_max_shirt_number(assignment.shirt.gender)
+            if assignment.shirt.number > max_n:
+                offenders.append((assignment.shirt, assignment.member, max_n))
+        offenders.sort(key=lambda row: (row[0].gender, row[0].number))
+        return offenders
 
     def get_activity_seasons(self, completed_season_count):
         seasons = []
@@ -183,6 +220,8 @@ class Command(BaseCommand):
             self,
             member_count,
             duplicate_numbers,
+            multi_shirt_members,
+            over_max_shirts,
             inactive_members,
             activity_seasons,
             include_never_played=False):
@@ -200,6 +239,28 @@ class Command(BaseCommand):
                 )
         else:
             self.stdout.write('No duplicate shirt numbers found.')
+
+        if multi_shirt_members:
+            self.stdout.write(
+                'Found {} members holding multiple active shirts.'.format(len(multi_shirt_members)))
+            for member, shirts in multi_shirt_members.items():
+                self.stdout.write(
+                    '  {}: {}'.format(
+                        member.full_name(),
+                        ', '.join(str(s) for s in shirts),
+                    )
+                )
+        else:
+            self.stdout.write('No members with multiple active shirts.')
+
+        if over_max_shirts:
+            self.stdout.write(
+                'Found {} active shirts above the current ClubInfo max:'.format(len(over_max_shirts)))
+            for shirt, member, max_n in over_max_shirts:
+                self.stdout.write(
+                    '  {} #{} (max {}): {}'.format(shirt.gender, shirt.number, max_n, member.full_name()))
+        else:
+            self.stdout.write('No shirts in use above the configured max.')
 
         season_list = ', '.join(season.slug for season in activity_seasons)
         never_played_suffix = ' (including never-played members)' if include_never_played else ''
@@ -229,6 +290,8 @@ class Command(BaseCommand):
             inactive_seasons,
             activity_seasons,
             duplicate_numbers,
+            multi_shirt_members,
+            over_max_shirts,
             inactive_members,
             include_never_played=False):
         lines = [
@@ -255,6 +318,26 @@ class Command(BaseCommand):
                 )
             lines.append('')
 
+        if multi_shirt_members:
+            lines.append('### Members holding multiple active shirts ###')
+            lines.append('Action: review these members and end whichever assignments are no longer current.')
+            lines.append('')
+            for member, shirts in multi_shirt_members.items():
+                lines.append('{}: {}'.format(
+                    member.full_name(),
+                    ', '.join(str(s) for s in shirts),
+                ))
+            lines.append('')
+
+        if over_max_shirts:
+            lines.append('### Shirts above configured max ###')
+            lines.append('Action: either raise the ClubInfo MaxShirtNumber* value, or reassign these members.')
+            lines.append('')
+            for shirt, member, max_n in over_max_shirts:
+                lines.append('{} #{} (max {}): {}'.format(
+                    shirt.gender, shirt.number, max_n, member.full_name()))
+            lines.append('')
+
         if inactive_members:
             lines.append('### Inactive current members ###')
             lines.append('Action: review these members and unset "current" for anyone who is no longer a current player.')
@@ -267,8 +350,15 @@ class Command(BaseCommand):
         return '\n'.join(lines)
 
     def format_inactive_member(self, member, last_season):
+        assignment = member.current_shirt_number()
+        if assignment is None:
+            shirt = '-'
+        elif assignment.end_date is not None:
+            shirt = '{} (grace until {})'.format(assignment.shirt.number, assignment.end_date)
+        else:
+            shirt = str(assignment.shirt.number)
         return '{} (shirt: {}; last appearance: {})'.format(
             member.full_name(),
-            (member.shirt_number or '').strip() or '-',
+            shirt,
             last_season or 'never',
         )

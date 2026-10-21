@@ -77,6 +77,18 @@ class Gender(object):
     )
 
 
+class ShirtNumberStatus(object):
+    """ Enumeration of shirt-number statuses """
+    Available = 'Available'
+    Assigned = 'Assigned'
+    Unavailable = 'Unavailable'
+    Choices = (
+        ('Available', 'Available'),
+        ('Assigned', 'Assigned'),
+        ('Unavailable', 'Unavailable'),
+    )
+
+
 class Position(object):
     """ Enumeration of preferred positions """
     GK = 0

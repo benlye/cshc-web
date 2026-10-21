@@ -15,7 +15,10 @@ from core.filters import AndFilter
 from core.utils import get_thumbnail_url
 from competitions.schema import SeasonType
 from .stats import SquadPlayingStats, AllSeasonsPlayingStats
-from .models import CommitteePosition, Member, CommitteeMembership, SquadMembership
+from .models import (
+    CommitteePosition, Member, CommitteeMembership, SquadMembership,
+    ShirtNumber, ShirtNumberAssignment,
+)
 
 
 class NumberInFilter(django_filters.BaseInFilter, django_filters.CharFilter):
@@ -84,6 +87,41 @@ class SquadMembershipList(DjangoListObjectType):
         pagination = get_paginator()
 
 
+class ShirtNumberType(DjangoObjectType):
+    """ GraphQL node representing a shirt in the pool """
+    class Meta:
+        model = ShirtNumber
+        filter_fields = {
+            'number': ['exact'],
+            'gender': ['exact'],
+            'status': ['exact'],
+        }
+
+
+class ShirtNumberList(DjangoListObjectType):
+    class Meta:
+        description = "Type definition for a list of shirt numbers"
+        model = ShirtNumber
+        pagination = get_paginator()
+
+
+class ShirtNumberAssignmentType(DjangoObjectType):
+    """ GraphQL node representing a historic or current shirt assignment """
+    class Meta:
+        model = ShirtNumberAssignment
+        filter_fields = {
+            'member_id': ['exact'],
+            'shirt_id': ['exact'],
+        }
+
+
+class ShirtNumberAssignmentList(DjangoListObjectType):
+    class Meta:
+        description = "Type definition for a list of shirt number assignments"
+        model = ShirtNumberAssignment
+        pagination = get_paginator()
+
+
 class MemberType(DjangoObjectType):
     """ GraphQL node representing a club member """
     thumb_url = graphene.String(size=graphene.String(), crop=graphene.String())
@@ -91,6 +129,7 @@ class MemberType(DjangoObjectType):
     num_appearances = graphene.Int()
     goals = graphene.Int()
     full_name = graphene.String()
+    shirt_number = graphene.String()
 
     class Meta:
         model = Member
@@ -129,6 +168,10 @@ class MemberType(DjangoObjectType):
 
     def resolve_full_name(self, info):
         return self.full_name()
+
+    def resolve_shirt_number(self, info):
+        assignment = self.current_shirt_number()
+        return str(assignment.shirt.number) if assignment else ''
 
 
 class MemberList(DjangoListObjectType):
@@ -255,6 +298,10 @@ class Query(graphene.ObjectType):
         CommitteeMembershipList)
 
     squad_memberships = OptimizedDjangoListObjectField(SquadMembershipList)
+
+    shirt_numbers = OptimizedDjangoListObjectField(ShirtNumberList)
+
+    shirt_number_assignments = OptimizedDjangoListObjectField(ShirtNumberAssignmentList)
 
     members = OptimizedDjangoListObjectField(
         MemberList, filterset_class=MemberFilter, post_optimize=post_optimize_members)
