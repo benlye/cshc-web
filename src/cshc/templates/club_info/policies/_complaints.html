@@ -1,5 +1,6 @@
 {% load cshc_tags %}
 {% clubinfo 'SecretaryName' as secretary_name %}
+{% clubinfo 'WelfareOfficerName' as welfare_name %}
 {% include 'blocks/_divider.html' %}
 <section id="complaints" class="container g-mt-20 g-mt-40--md g-mb-40 g-font-size-16 g-font-size-18--md">
   {% include 'blocks/_middle_heading.html' with title="Complaints and Concerns" %}
@@ -18,6 +19,8 @@
   {% include 'blocks/_middle_subheading.html' with title="Formal Complaints" %}
   <p>Where a concern cannot be resolved informally, or where the nature of the matter makes an informal approach
     inappropriate, a formal complaint may be made to the {% clubinfo_email 'SecretaryEmail' secretary_name %}.</p>
+  <p>Complaints or concerns relating to safeguarding should be reported directly to the 
+    {% clubinfo_email 'WelfareOfficerEmail' welfare_name %}, in accordance with the Club's Safeguarding Policy.</p>
   <p>A formal complaint should normally be made in writing and should explain:</p>
   <ul>
     <li>what has happened</li>
@@ -40,6 +43,7 @@
     <li>seek further information where necessary</li>
     <li>handle information sensitively and share it only where reasonably necessary to consider the matter</li>
     <li>communicate the outcome to the complainant when the process is complete</li>
+    <li>provide reasons for decisions and explain any available review or appeal process.</li>
   </ul>
 
   <p>The procedure followed will be proportionate to the nature and seriousness of the complaint. Some matters may be
@@ -48,13 +52,16 @@
   <p>Where a complaint identifies an opportunity to improve Club policies or practices, the Club will consider appropriate
     changes.</p>
 
-  {% include 'blocks/_middle_subheading.html' with title="Conflicts of Interest" %}
+  {% include 'blocks/_middle_subheading.html' with title="Impartiality and Conflicts of Interest" %}
+  <p>Complaints will be considered fairly and impartially by individuals who have no material conflict of interest.</p>
   <p>A person who is directly involved in a complaint, or who has another material conflict of interest, should not be
     responsible for deciding its outcome.</p>
+  <p>Where a complaint is considered by a group or panel, the Club will seek to ensure that its composition is appropriate
+    to the nature of the complaint, taking account of relevant experience, representation and the need for impartiality.</p>
   <p>If a complaint concerns the Club Secretary, it should be raised with the Chair. If it concerns the Chair, it should
     be raised with another appropriate member of the Club Committee.</p>
-  <p>The Club may appoint other suitably independent people to consider a complaint where this is necessary to ensure that
-    it is handled fairly.</p>
+  <p>Where there are insufficient impartial Committee members available, the Club may appoint other suitably independent
+    individuals to consider the complaint.</p>
 
   {% include 'blocks/_middle_subheading.html' with title="Outcome and Review" %}
   <p>The complainant will be informed of the outcome of a formal complaint and, where appropriate, any action the Club
@@ -64,6 +71,13 @@
   <p>A review should, wherever practicable, be undertaken by someone who was not responsible for the original decision.</p>
   <p>A review is not normally a complete rehearing of the complaint, but will consider whether the complaint was handled
     fairly, whether relevant information was properly considered, and whether the outcome was reasonable in the circumstances.</p>
+  <p>Where the Club is unable to reach a fair and impartial decision, or where a review cannot reasonably be undertaken
+    by individuals independent of the original decision, the Club may seek advice or assistance from an appropriate
+    independent person or body.</p>
+  <p>This may include appointing individuals from outside the Club to consider the matter or seeking guidance from
+    England Hockey or the relevant Area hockey authority.</p>
+  <p>Where a complaint falls within England Hockey's jurisdiction, it will be referred or handled in accordance with the
+    applicable England Hockey procedures.</p>
 
   {% include 'blocks/_middle_subheading.html' with title="Safeguarding Concerns" %}
   <p>A concern involving the welfare or safeguarding of a child or young person should be reported promptly to the
