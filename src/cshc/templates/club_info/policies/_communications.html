@@ -1,3 +1,4 @@
+{% load cshc_tags %}
 {% include 'blocks/_divider.html' %}
 <section id="communications" class="container g-mt-20 g-mt-40--md g-mb-40 g-font-size-16 g-font-size-18--md">
   {% include 'blocks/_middle_heading.html' with title="Communications" %}
@@ -65,8 +66,8 @@
     Club's Data and Privacy Policy.</p>
 
   {% include 'blocks/_middle_subheading.html' with title="Concerns and Inappropriate Communication" %}
-  <p>Members should report inappropriate, offensive or concerning communications to a Club officer or the
-    <a href="mailto:welfare@cambridgesouthhockeyclub.co.uk">Club's Welfare Officer</a>.</p>
+  <p>Members should report inappropriate, offensive or concerning communications to a Club officer or the Club's
+    {% clubinfo_email 'WelfareOfficerEmail' 'Welfare Officer' %}.</p>
   <p>Any safeguarding concern involving communication with a young person should be reported in accordance with the Club's
     safeguarding procedures and England Hockey guidance.</p>
 </section>

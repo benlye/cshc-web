@@ -1,3 +1,4 @@
+{% load cshc_tags %}
 {% include 'blocks/_divider.html' %}
 <section id="safeguarding" class="container g-mt-20 g-mt-40--md g-mb-40 g-font-size-16 g-font-size-18--md">
   {% include 'blocks/_middle_heading.html' with title="Safeguarding" %}
@@ -8,7 +9,7 @@
     members, coaches, officials and volunteers are expected to follow these policies whenever they are responsible for,
     or participating in hockey with, young people.</p>
   <p>Any concern about the welfare of a young person, or about the behaviour of an adult towards a young person, should
-    be reported to the <a href="mailto:welfare@cambridgesouthhockeyclub.co.uk">Club's Welfare Officer</a> in accordance 
+    be reported to the Club's {% clubinfo_email 'WelfareOfficerEmail' 'Welfare Officer' %}.</p> in accordance 
     with England Hockey's safeguarding procedures.</p>
   
   <p>For more information, see:</p>

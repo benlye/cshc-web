@@ -1,3 +1,4 @@
+{% load cshc_tags %}
 {% include 'blocks/_divider.html' %}
 <section id="photography" class="container g-mt-20 g-mt-40--md g-mb-40 g-font-size-16 g-font-size-18--md">
   {% include 'blocks/_middle_heading.html' with title="Photography and Videography" %}
@@ -42,5 +43,5 @@
     and do not interfere with play, coaching or the enjoyment of others.</p>
   <p>Photography or filming must not take place in changing rooms, toilets or other private areas.</p>
   <p>Any concerns about photography or filming, particularly where they involve a child or young person, should be raised
-    with a Club official or the <a href="mailto:welfare@cambridgesouthhockeyclub.co.uk">Club's Welfare Officer</a>.</p>
+    with a Club official or the Club's {% clubinfo_email 'WelfareOfficerEmail' 'Welfare Officer' %}.</p>.</p>
 </section>
